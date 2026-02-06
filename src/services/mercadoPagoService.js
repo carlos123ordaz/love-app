@@ -91,7 +91,6 @@ class MercadoPagoService {
         try {
             const { action, data: paymentData, type } = data;
 
-            // MercadoPago v2 usa "action", v1 usa "type"
             const isPayment =
                 type === 'payment' ||
                 action === 'payment.created' ||
@@ -101,8 +100,14 @@ class MercadoPagoService {
                 return { processed: false, reason: `Not a payment notification: ${action || type}` };
             }
 
+            // Ignorar payment.created — el pago aún no está listo para consultar.
+            // Solo procesar payment.updated (que llega cuando el pago se completa).
+            if (action === 'payment.created') {
+                return { processed: false, reason: 'Ignoring payment.created, waiting for payment.updated' };
+            }
+
             const paymentId = paymentData.id;
-            const paymentInfo = await this.getPaymentInfo(paymentId);
+            const paymentInfo = await this.getPaymentInfoWithRetry(paymentId);
 
             return {
                 processed: true,
@@ -113,6 +118,21 @@ class MercadoPagoService {
         } catch (error) {
             console.error('Error processing webhook:', error);
             throw error;
+        }
+    }
+
+    async getPaymentInfoWithRetry(paymentId, retries = 3, delay = 2000) {
+        for (let i = 0; i < retries; i++) {
+            try {
+                return await this.getPaymentInfo(paymentId);
+            } catch (error) {
+                if (i < retries - 1) {
+                    console.log(`⏳ Retry ${i + 1}/${retries} for payment ${paymentId}...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    throw error;
+                }
+            }
         }
     }
 
