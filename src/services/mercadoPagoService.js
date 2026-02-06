@@ -64,7 +64,6 @@ class MercadoPagoService {
             return {
                 preferenceId: response.id,
                 initPoint: response.init_point,
-                sandboxInitPoint: response.sandbox_init_point,
             };
         } catch (error) {
             console.error('❌ Error creating MercadoPago preference:', {
