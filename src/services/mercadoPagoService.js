@@ -76,58 +76,57 @@ class MercadoPagoService {
         }
     }
 
-    /**
-     * 👇 MÉTODO ACTUALIZADO CON REINTENTOS
-     * Obtener información del pago con reintentos automáticos
-     */
-    async getPaymentInfo(paymentId, maxRetries = 5, delayMs = 2000) {
-        let lastError = null;
+  /**
+ * Obtener información del pago con reintentos automáticos
+ * Por defecto: 10 intentos x 3 segundos = 30 segundos máximo
+ */
+async getPaymentInfo(paymentId, maxRetries = 10, delayMs = 3000) {
+    let lastError = null;
 
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                console.log(`🔄 [Intento ${attempt}/${maxRetries}] Obteniendo pago: ${paymentId}`);
-                
-                const payment = await this.payment.get({ id: paymentId });
-                
-                console.log('✅ Pago encontrado:', {
-                    id: payment.id,
-                    status: payment.status,
-                    status_detail: payment.status_detail,
-                    external_reference: payment.external_reference,
-                });
-                
-                return payment; // ✅ Éxito - retornar el pago
-                
-            } catch (error) {
-                lastError = error;
-                
-                // Si es 404 y aún quedan intentos, esperar y reintentar
-                if (error.status === 404 && attempt < maxRetries) {
-                    console.log(`⏳ Pago no disponible aún. Esperando ${delayMs}ms antes del siguiente intento...`);
-                    await this.sleep(delayMs);
-                    continue; // Reintentar
-                }
-                
-                // Si no es 404 o ya no quedan intentos, lanzar error
-                console.error(`❌ Error obteniendo pago (intento ${attempt}/${maxRetries}):`, {
-                    message: error.message,
-                    error: error.error,
-                    status: error.status,
-                    cause: error.cause,
-                });
-                
-                // Si no quedan más intentos, lanzar el error
-                if (attempt === maxRetries) {
-                    break;
-                }
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`🔄 [Intento ${attempt}/${maxRetries}] Obteniendo pago: ${paymentId}`);
+            
+            const payment = await this.payment.get({ id: paymentId });
+            
+            console.log(`✅ Pago encontrado en el intento ${attempt}:`, {
+                id: payment.id,
+                status: payment.status,
+                status_detail: payment.status_detail,
+                external_reference: payment.external_reference,
+            });
+            
+            return payment; // ✅ Éxito - retornar el pago
+            
+        } catch (error) {
+            lastError = error;
+            
+            // Si es 404 y aún quedan intentos, esperar y reintentar
+            if (error.status === 404 && attempt < maxRetries) {
+                console.log(`⏳ Pago no disponible aún. Esperando ${delayMs}ms antes del siguiente intento... (${attempt}/${maxRetries})`);
+                await this.sleep(delayMs);
+                continue; // Reintentar
+            }
+            
+            // Si no es 404 o ya no quedan intentos, lanzar error
+            console.error(`❌ Error obteniendo pago (intento ${attempt}/${maxRetries}):`, {
+                message: error.message,
+                error: error.error,
+                status: error.status,
+                cause: error.cause,
+            });
+            
+            // Si no quedan más intentos, lanzar el error
+            if (attempt === maxRetries) {
+                break;
             }
         }
-        
-        // Si llegamos aquí, fallaron todos los intentos
-        console.error(`❌ No se pudo obtener el pago después de ${maxRetries} intentos`);
-        throw new Error(`No se pudo obtener información del pago ${paymentId} después de ${maxRetries} intentos`);
     }
-
+    
+    // Si llegamos aquí, fallaron todos los intentos
+    console.error(`❌ No se pudo obtener el pago después de ${maxRetries} intentos (${maxRetries * delayMs / 1000} segundos)`);
+    throw new Error(`No se pudo obtener información del pago ${paymentId} después de ${maxRetries} intentos`);
+}
     /**
      * Helper para esperar
      */
