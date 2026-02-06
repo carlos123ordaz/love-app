@@ -22,8 +22,8 @@ class MercadoPagoService {
                         title: 'Plan PRO - Páginas Ilimitadas',
                         description: 'Acceso permanente a creación ilimitada de páginas personalizadas con IA',
                         quantity: 1,
-                        currency_id: 'USD',
-                        unit_price: 3,
+                        currency_id: 'PEN',
+                        unit_price: 10,
                     },
                 ],
                 payer: {
