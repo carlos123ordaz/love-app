@@ -62,7 +62,7 @@ userSchema.index({ email: 1, firebaseUid: 1 });
 // Método virtual para verificar si el usuario puede crear más páginas
 userSchema.virtual('canCreatePage').get(function () {
     if (this.isPro) return true;
-    return this.pagesCreated < 5;
+    return this.pagesCreated < 3;
 });
 
 // Método para verificar si el PRO está activo
