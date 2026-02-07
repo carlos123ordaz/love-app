@@ -21,10 +21,7 @@ app.use(helmet());
 app.set('trust proxy', 1);
 // CORS
 const corsOptions = {
-    origin:
-        process.env.NODE_ENV === 'production'
-            ? [process.env.FRONTEND_URL]
-            : ['http://localhost:3000', 'http://localhost:3001', 'https://barbera-uneyeable-scrutinizingly.ngrok-free.dev'],
+    origin:[process.env.FRONTEND_URL,'http://localhost:3000'],
     credentials: true,
     optionsSuccessStatus: 200,
 };
