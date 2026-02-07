@@ -93,6 +93,7 @@ class PageController {
     async createPage(req, res) {
         try {
             const user = req.user;
+            console.log('user: ', user)
             const {
                 title,
                 recipientName,
@@ -135,7 +136,14 @@ class PageController {
             }
 
             const isPro = user.isProActive();
-
+            if (!isPro && user.pagesCreated > 1) {
+               return res.status(403).json({
+                    success: false,
+                    message: 'Ya superó el límite de páginas gratuitas',
+                    errors: proErrors,
+                    code: 'PRO_REQUIRED',
+                });
+            }
             // Parsear stickers
             const parsedStickers = safeJsonParse(selectedStickers);
 
