@@ -99,15 +99,24 @@ class MercadoPagoService {
                 return { processed: false, reason: `Not a payment notification: ${action || type}` };
             }
 
-            // Si tiene action "payment.created", ignorar (esperar payment.updated)
+            // Ignorar solo payment.created (formato nuevo con action)
             if (action === 'payment.created') {
                 return { processed: false, reason: 'Ignoring payment.created, waiting for payment.updated' };
             }
 
-            // Si action es undefined pero type es 'payment' (formato IPN legacy),
-            // consultar el estado directamente a MercadoPago
+            // Si action es 'payment.updated' O si es IPN legacy (action undefined, type 'payment'),
+            // consultar el pago directamente a MercadoPago
             const paymentId = paymentData.id;
+            console.log(`🔍 Consultando pago ${paymentId} a MercadoPago...`);
+
             const paymentInfo = await this.getPaymentInfoWithRetry(paymentId);
+
+            console.log(`💰 Estado del pago ${paymentId}: ${paymentInfo.status} (${paymentInfo.status_detail})`);
+
+            // Solo procesar si está aprobado o tiene un estado final
+            if (paymentInfo.status === 'pending' || paymentInfo.status === 'in_process') {
+                return { processed: false, reason: `Payment ${paymentId} still ${paymentInfo.status}, will wait` };
+            }
 
             return {
                 processed: true,
