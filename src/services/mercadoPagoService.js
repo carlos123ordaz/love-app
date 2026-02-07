@@ -99,12 +99,13 @@ class MercadoPagoService {
                 return { processed: false, reason: `Not a payment notification: ${action || type}` };
             }
 
-            // Ignorar payment.created — el pago aún no está listo para consultar.
-            // Solo procesar payment.updated (que llega cuando el pago se completa).
+            // Si tiene action "payment.created", ignorar (esperar payment.updated)
             if (action === 'payment.created') {
                 return { processed: false, reason: 'Ignoring payment.created, waiting for payment.updated' };
             }
 
+            // Si action es undefined pero type es 'payment' (formato IPN legacy),
+            // consultar el estado directamente a MercadoPago
             const paymentId = paymentData.id;
             const paymentInfo = await this.getPaymentInfoWithRetry(paymentId);
 

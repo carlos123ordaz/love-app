@@ -110,45 +110,47 @@ class PaymentController {
      */
     async handleWebhook(req, res) {
         try {
-            console.log('📩 Webhook received from MercadoPago:', req.body);
+            // Responder rápido a MercadoPago para evitar reintentos
+            res.status(200).send('OK');
 
-            const webhookData = req.body?.action
-                ? req.body
-                : {
-                    type: req.query.type || req.query.topic,
-                    data: { id: req.query['data.id'] || req.query.id },
-                    action: req.query.type === 'payment' ? 'payment.updated' : undefined,
+            let webhookData;
+
+            if (req.body?.action || req.body?.type === 'payment') {
+                // Formato nuevo (body con action)
+                webhookData = req.body;
+            } else if (req.query.topic || req.query.type) {
+                // Formato IPN legacy (query params)
+                webhookData = {
+                    type: req.query.topic || req.query.type,
+                    data: { id: req.query.id || req.query['data.id'] },
                 };
+            } else {
+                console.log('⚠️ Webhook format not recognized');
+                return;
+            }
 
             console.log('📩 Webhook received:', webhookData);
 
-            // Procesar la notificación
             const result = await mercadoPagoService.processWebhookNotification(webhookData);
 
             if (!result.processed) {
                 console.log('⚠️ Webhook not processed:', result.reason);
-                return res.status(200).send('OK');
+                return;
             }
 
             const { paymentInfo, externalReference } = result;
-
-            // Buscar el usuario por el external_reference
             const user = await User.findById(externalReference);
 
             if (!user) {
                 console.error('❌ User not found for payment:', externalReference);
-                return res.status(404).send('User not found');
+                return;
             }
 
-            // Si el pago fue aprobado, activar el plan PRO
             if (mercadoPagoService.isPaymentApproved(paymentInfo)) {
                 await this.activateProPlan(user, paymentInfo);
             }
-
-            return res.status(200).send('OK');
         } catch (error) {
             console.error('Error handling webhook:', error);
-            return res.status(500).send('Error processing webhook');
         }
     }
 

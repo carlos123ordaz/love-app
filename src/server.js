@@ -18,7 +18,7 @@ const app = express();
 connectDB();
 
 app.use(helmet());
-
+app.set('trust proxy', 1);
 // CORS
 const corsOptions = {
     origin:
