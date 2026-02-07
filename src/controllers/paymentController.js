@@ -112,7 +112,15 @@ class PaymentController {
         try {
             console.log('📩 Webhook received from MercadoPago:', req.body);
 
-            const webhookData = req.body;
+            const webhookData = req.body?.action
+                ? req.body
+                : {
+                    type: req.query.type || req.query.topic,
+                    data: { id: req.query['data.id'] || req.query.id },
+                    action: req.query.type === 'payment' ? 'payment.updated' : undefined,
+                };
+
+            console.log('📩 Webhook received:', webhookData);
 
             // Procesar la notificación
             const result = await mercadoPagoService.processWebhookNotification(webhookData);
