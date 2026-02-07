@@ -16,7 +16,7 @@ const router = express.Router();
 
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 },
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB por archivo
     fileFilter: (req, file, cb) => {
         const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
         if (allowedMimes.includes(file.mimetype)) {
@@ -27,32 +27,43 @@ const upload = multer({
     },
 });
 
-// === RUTAS ESTÁTICAS (van primero para evitar conflicto con :params) ===
+// Configuración de campos para múltiples archivos
+const uploadFields = upload.fields([
+    { name: 'backgroundImage', maxCount: 1 },
+    { name: 'referenceImage', maxCount: 1 },
+    { name: 'decorativeImage_0', maxCount: 1 },
+    { name: 'decorativeImage_1', maxCount: 1 },
+    { name: 'decorativeImage_2', maxCount: 1 },
+    { name: 'decorativeImage_3', maxCount: 1 },
+    { name: 'decorativeImage_4', maxCount: 1 },
+]);
 
-// POST /api/pages - Crear página
+// === RUTAS ESTÁTICAS ===
+
+// POST /api/pages - Crear página (ACTUALIZADO con múltiples archivos)
 router.post(
     '/',
     authenticate,
     checkPageLimit,
     createPageLimiter,
-    upload.single('referenceImage'),
+    uploadFields,
     sanitizeInputs,
     validatePageCreation,
     (req, res) => pageController.createPage(req, res)
 );
 
-// GET /api/pages/my-pages - Mis páginas
+// GET /api/pages/my-pages
 router.get('/my-pages', authenticate, (req, res) => pageController.getUserPages(req, res));
 
-// GET /api/pages/stats - Estadísticas
+// GET /api/pages/stats
 router.get('/stats', authenticate, (req, res) => pageControllerExtended.getUserStats(req, res));
 
-// === RUTAS CON /public/ (van antes de las rutas con :pageId) ===
+// === RUTAS CON /public/ ===
 
-// GET /api/pages/public/:shortId - Ver página pública
+// GET /api/pages/public/:shortId
 router.get('/public/:shortId', optionalAuth, (req, res) => pageController.getPageByShortId(req, res));
 
-// POST /api/pages/public/:shortId/respond - Responder a página
+// POST /api/pages/public/:shortId/respond
 router.post(
     '/public/:shortId/respond',
     responsePageLimiter,
@@ -61,18 +72,11 @@ router.post(
     (req, res) => pageController.respondToPage(req, res)
 );
 
-// === RUTAS CON :pageId (van al final) ===
+// === RUTAS CON :pageId ===
 
-// GET /api/pages/:pageId/details - Detalles de página (dueño)
 router.get('/:pageId/details', authenticate, (req, res) => pageControllerExtended.getPageDetails(req, res));
-
-// PATCH /api/pages/:pageId - Actualizar página
 router.patch('/:pageId', authenticate, sanitizeInputs, (req, res) => pageControllerExtended.updatePage(req, res));
-
-// DELETE /api/pages/:pageId - Eliminar página
 router.delete('/:pageId', authenticate, (req, res) => pageControllerExtended.deletePage(req, res));
-
-// PATCH /api/pages/:pageId/toggle - Toggle estado
 router.patch('/:pageId/toggle', authenticate, (req, res) => pageControllerExtended.togglePageStatus(req, res));
 
 export default router;

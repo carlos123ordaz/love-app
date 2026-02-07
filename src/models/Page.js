@@ -49,7 +49,10 @@ const pageSchema = new mongoose.Schema(
             required: true,
             index: true,
         },
-        // Contenido personalizable
+
+        // ============================================
+        // CONTENIDO
+        // ============================================
         title: {
             type: String,
             required: true,
@@ -65,7 +68,6 @@ const pageSchema = new mongoose.Schema(
             default: '',
             maxlength: 1000,
         },
-        // Personalización de botones
         yesButtonText: {
             type: String,
             default: 'Sí',
@@ -80,12 +82,16 @@ const pageSchema = new mongoose.Schema(
             type: Boolean,
             default: false,
         },
-        // Tipo de página (free o pro)
+
+        // ============================================
+        // TIPO DE PÁGINA
+        // ============================================
         pageType: {
             type: String,
             enum: ['free', 'pro'],
             default: 'free',
         },
+
         // Para páginas PRO: HTML/CSS generado por IA
         customHTML: {
             type: String,
@@ -99,10 +105,18 @@ const pageSchema = new mongoose.Schema(
             type: String,
             default: null,
         },
-        // Tema/estilo para páginas free
+
+        // ============================================
+        // DISEÑO - TEMA Y COLORES
+        // ============================================
         theme: {
             type: String,
-            enum: ['romantic', 'playful', 'elegant', 'minimal', 'custom'],
+            enum: [
+                'romantic', 'sunset', 'ocean', 'garden', 'playful',
+                'elegant', 'minimal', 'dark',
+                // PRO themes
+                'neon', 'vintage', 'aurora', 'cherry', 'custom',
+            ],
             default: 'romantic',
         },
         backgroundColor: {
@@ -113,9 +127,94 @@ const pageSchema = new mongoose.Schema(
             type: String,
             default: '#ffffff',
         },
-        // Respuestas recibidas
+        accentColor: {
+            type: String,
+            default: '#ff1493',
+        },
+
+        // ============================================
+        // TIPOGRAFÍA (NUEVO)
+        // ============================================
+        titleFont: {
+            type: String,
+            default: 'Dancing Script',
+            maxlength: 100,
+        },
+        bodyFont: {
+            type: String,
+            default: 'Quicksand',
+            maxlength: 100,
+        },
+
+        // ============================================
+        // IMÁGENES (NUEVO)
+        // ============================================
+        backgroundImageUrl: {
+            type: String,
+            default: null,
+        },
+        decorativeImageUrls: {
+            type: [String],
+            default: [],
+            validate: {
+                validator: function (v) {
+                    return v.length <= 5; // máximo 5 imágenes decorativas
+                },
+                message: 'Máximo 5 imágenes decorativas',
+            },
+        },
+
+        // ============================================
+        // STICKERS (NUEVO)
+        // ============================================
+        selectedStickers: {
+            type: [String],
+            default: [],
+            validate: {
+                validator: function (v) {
+                    return v.length <= 10;
+                },
+                message: 'Máximo 10 stickers',
+            },
+        },
+
+        // ============================================
+        // ANIMACIONES (NUEVO)
+        // ============================================
+        animation: {
+            type: String,
+            enum: [
+                'none', 'hearts-falling', 'fade-in', 'float-up',
+                // PRO animations
+                'confetti', 'particles', 'fireworks', 'snow', 'petals', 'bubbles',
+            ],
+            default: 'none',
+        },
+
+        // ============================================
+        // MÚSICA (NUEVO - solo PRO)
+        // ============================================
+        backgroundMusic: {
+            type: String,
+            enum: [
+                'none', 'romantic-piano', 'acoustic-guitar',
+                'love-song', 'music-box', 'orchestra',
+            ],
+            default: 'none',
+        },
+
+        // ============================================
+        // EXTRAS
+        // ============================================
+        showWatermark: {
+            type: Boolean,
+            default: true, // free siempre true, PRO puede quitar
+        },
+
+        // ============================================
+        // ESTADÍSTICAS
+        // ============================================
         responses: [responseSchema],
-        // Estadísticas
         views: {
             type: Number,
             default: 0,
@@ -124,6 +223,7 @@ const pageSchema = new mongoose.Schema(
             type: Number,
             default: 0,
         },
+
         // Estado
         isActive: {
             type: Boolean,
@@ -131,7 +231,7 @@ const pageSchema = new mongoose.Schema(
         },
         expiresAt: {
             type: Date,
-            default: null, // null = permanente
+            default: null,
         },
     },
     {
@@ -188,7 +288,7 @@ pageSchema.methods.getStats = function () {
     };
 };
 
-// Middleware pre-save para generar shortId si no existe
+// Middleware pre-save
 pageSchema.pre('save', async function (next) {
     if (!this.shortId) {
         this.shortId = nanoid(10);
