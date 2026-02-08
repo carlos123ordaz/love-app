@@ -9,6 +9,7 @@ import authRoutes from './routes/authRoutes.js';
 import pageRoutes from './routes/pageRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
+import contactRoutes from './routes/contactRoutes.js';
 
 dotenv.config();
 
@@ -56,7 +57,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/pages', pageRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/webhooks', webhookRoutes);
-
+app.use('/api/contact', contactRoutes); 
 // Ruta 404
 app.use('*', (req, res) => {
     res.status(404).json({
