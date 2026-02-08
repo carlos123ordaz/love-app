@@ -140,15 +140,15 @@ class PageControllerExtended {
             }
 
             // Si tiene imagen de referencia, eliminarla de Firebase Storage
-            if (page.referenceImageUrl) {
-                await storageService.deleteImage(page.referenceImageUrl);
-            }
+            // if (page.referenceImageUrl) {
+            //     await storageService.deleteImage(page.referenceImageUrl);
+            // }
 
             await Page.findByIdAndDelete(pageId);
 
             // Decrementar contador de páginas del usuario
-            user.pagesCreated = Math.max(0, user.pagesCreated - 1);
-            await user.save();
+            // user.pagesCreated = Math.max(0, user.pagesCreated - 1);
+            // await user.save();
 
             return res.json({
                 success: true,
