@@ -31,6 +31,10 @@ const userSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+        isAdmin: {
+            type: Boolean,
+            default: false,
+        },
         pagesCreated: {
             type: Number,
             default: 0,

@@ -23,6 +23,7 @@ class AuthController {
                     remainingPages: user.isPro ? 'unlimited' : Math.max(0, 1 - user.pagesCreated),
                     lastLogin: user.lastLogin,
                     createdAt: user.createdAt,
+                    isAdmin: user.isAdmin,
                 },
             });
         } catch (error) {

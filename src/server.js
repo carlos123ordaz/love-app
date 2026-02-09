@@ -10,6 +10,7 @@ import pageRoutes from './routes/pageRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 
 dotenv.config();
 
@@ -22,7 +23,7 @@ app.use(helmet());
 app.set('trust proxy', 1);
 // CORS
 const corsOptions = {
-    origin:[process.env.FRONTEND_URL,'http://localhost:3000'],
+    origin: [process.env.FRONTEND_URL, 'http://localhost:3000', 'http://localhost:3001'],
     credentials: true,
     optionsSuccessStatus: 200,
 };
@@ -57,7 +58,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/pages', pageRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/webhooks', webhookRoutes);
-app.use('/api/contact', contactRoutes); 
+app.use('/api/contact', contactRoutes);
+app.use('/api/admin', adminRoutes);
 // Ruta 404
 app.use('*', (req, res) => {
     res.status(404).json({
