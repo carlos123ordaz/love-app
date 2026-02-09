@@ -136,7 +136,7 @@ class PageController {
             }
 
             const isPro = user.isProActive();
-            if (!isPro && user.pagesCreated > 1) {
+            if (!isPro && user.pagesCreated > 0) {
                return res.status(403).json({
                     success: false,
                     message: 'Ya superó el límite de páginas gratuitas',

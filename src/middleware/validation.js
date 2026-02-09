@@ -153,13 +153,13 @@ export const checkPageLimit = async (req, res, next) => {
         }
 
         // Verificar límite de páginas gratuitas
-        if (user.pagesCreated >= 5) {
+        if (user.pagesCreated >= 1) {
             return res.status(403).json({
                 success: false,
-                message: 'Has alcanzado el límite de 5 páginas gratuitas',
+                message: 'Has alcanzado el límite de 1 página gratuita',
                 code: 'PAGE_LIMIT_REACHED',
                 pagesCreated: user.pagesCreated,
-                limit: 5,
+                limit: 1,
             });
         }
 
