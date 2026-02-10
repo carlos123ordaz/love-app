@@ -23,7 +23,7 @@ class MercadoPagoService {
                         description: 'Acceso permanente a creación ilimitada de páginas personalizadas con IA',
                         quantity: 1,
                         currency_id: 'PEN',
-                        unit_price: 3,
+                        unit_price: 5,
                     },
                 ],
                 payer: {
