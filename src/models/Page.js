@@ -42,6 +42,10 @@ const pageSchema = new mongoose.Schema(
             default: () => nanoid(10),
             index: true,
         },
+        isDeleted: {
+            type: Boolean,
+            default: false,
+        },
         // Usuario propietario
         userId: {
             type: mongoose.Schema.Types.ObjectId,

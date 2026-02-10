@@ -273,7 +273,7 @@ class PageController {
     async getPageByShortId(req, res) {
         try {
             const { shortId } = req.params;
-            const page = await Page.findOne({ shortId, isActive: true }).populate('userId', 'displayName');
+            const page = await Page.findOne({ shortId, isActive: true,isDeleted: { $ne: true } }).populate('userId', 'displayName');
 
             if (!page) {
                 return res.status(404).json({
@@ -371,7 +371,7 @@ class PageController {
             const skip = (page - 1) * limit;
             const sortOrder = order === 'asc' ? 1 : -1;
 
-            const pages = await Page.find({ userId: user._id })
+            const pages = await Page.find({ userId: user._id,isDeleted: { $ne: true } })
                 .sort({ [sortBy]: sortOrder })
                 .skip(skip)
                 .limit(parseInt(limit))

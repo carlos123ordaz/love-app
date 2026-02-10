@@ -130,7 +130,7 @@ class PageControllerExtended {
             const user = req.user;
             const { pageId } = req.params;
 
-            const page = await Page.findOne({ _id: pageId, userId: user._id });
+            const page = await Page.findOne({ _id: pageId, userId: user._id, isDeleted: { $ne: true } });
 
             if (!page) {
                 return res.status(404).json({
@@ -139,16 +139,9 @@ class PageControllerExtended {
                 });
             }
 
-            // Si tiene imagen de referencia, eliminarla de Firebase Storage
-            // if (page.referenceImageUrl) {
-            //     await storageService.deleteImage(page.referenceImageUrl);
-            // }
-
-            await Page.findByIdAndDelete(pageId);
-
-            // Decrementar contador de páginas del usuario
-            // user.pagesCreated = Math.max(0, user.pagesCreated - 1);
-            // await user.save();
+            page.isDeleted = true;
+            page.isActive = false;
+            await page.save();
 
             return res.json({
                 success: true,
@@ -171,7 +164,7 @@ class PageControllerExtended {
         try {
             const user = req.user;
 
-            const pages = await Page.find({ userId: user._id });
+            const pages = await Page.find({ userId: user._id ,isDeleted: { $ne: true } });
 
             const stats = {
                 totalPages: pages.length,
