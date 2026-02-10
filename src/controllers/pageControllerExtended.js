@@ -33,6 +33,7 @@ class PageControllerExtended {
                         recipientName: page.recipientName,
                         message: page.message,
                         yesButtonText: page.yesButtonText,
+                        customSlug: page.customSlug, // 🆕
                         noButtonText: page.noButtonText,
                         noButtonEscapes: page.noButtonEscapes,
                         pageType: page.pageType,
@@ -164,7 +165,7 @@ class PageControllerExtended {
         try {
             const user = req.user;
 
-            const pages = await Page.find({ userId: user._id ,isDeleted: { $ne: true } });
+            const pages = await Page.find({ userId: user._id, isDeleted: { $ne: true } });
 
             const stats = {
                 totalPages: pages.length,

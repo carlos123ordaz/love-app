@@ -25,15 +25,13 @@ const LIMITS = {
 };
 
 /**
- * Parsear JSON de forma segura, deshaciendo HTML entities
- * que el middleware sanitizeInputs pueda haber introducido.
+ * Parsear JSON de forma segura
  */
 function safeJsonParse(value, fallback = []) {
     if (!value) return fallback;
-    if (Array.isArray(value)) return value; // ya es array
+    if (Array.isArray(value)) return value;
 
     try {
-        // Deshacer HTML entities comunes que sanitizeInputs introduce
         const cleaned = value
             .replace(/&quot;/g, '"')
             .replace(/&#x27;/g, "'")
@@ -81,19 +79,56 @@ class PageController {
             if (selectedStickers.length > LIMITS.free.maxStickers) {
                 errors.push(`Máximo ${LIMITS.free.maxStickers} stickers en plan gratuito`);
             }
+
+            // 🆕 Custom slug solo para PRO
+            if (body.customSlug) {
+                errors.push('Las URLs personalizadas requieren plan PRO');
+            }
         }
 
         return errors;
     }
 
     /**
-     * Crear nueva página (ACTUALIZADO)
+     * 🆕 NUEVO: Verificar disponibilidad de slug personalizado
+     * GET /api/pages/check-slug/:slug
+     */
+    async checkSlugAvailability(req, res) {
+        try {
+            const { slug } = req.params;
+            const user = req.user;
+
+            // Solo usuarios PRO pueden verificar slugs
+            if (!user.isProActive()) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Las URLs personalizadas requieren plan PRO',
+                    code: 'PRO_REQUIRED',
+                });
+            }
+
+            const result = await Page.isSlugAvailable(slug);
+
+            return res.json({
+                success: true,
+                data: result,
+            });
+        } catch (error) {
+            console.error('Error checking slug:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Error al verificar disponibilidad',
+            });
+        }
+    }
+
+    /**
+     * Crear nueva página (ACTUALIZADO con customSlug)
      * POST /api/pages
      */
     async createPage(req, res) {
         try {
             const user = req.user;
-            console.log('user: ', user)
             const {
                 title,
                 recipientName,
@@ -113,6 +148,8 @@ class PageController {
                 backgroundMusic,
                 selectedStickers,
                 showWatermark,
+                // 🆕 NUEVO: Custom slug
+                customSlug,
             } = req.body;
 
             // Verificar PRO para página tipo 'pro' (IA)
@@ -137,13 +174,36 @@ class PageController {
 
             const isPro = user.isProActive();
             if (!isPro && user.pagesCreated > 0) {
-               return res.status(403).json({
+                return res.status(403).json({
                     success: false,
                     message: 'Ya superó el límite de páginas gratuitas',
-                    errors: proErrors,
                     code: 'PRO_REQUIRED',
                 });
             }
+
+            // 🆕 Validar customSlug si se proporciona
+            let validatedSlug = null;
+            if (customSlug && customSlug.trim()) {
+                if (!isPro) {
+                    return res.status(403).json({
+                        success: false,
+                        message: 'Las URLs personalizadas requieren plan PRO',
+                        code: 'PRO_REQUIRED',
+                    });
+                }
+
+                const slugCheck = await Page.isSlugAvailable(customSlug.trim().toLowerCase());
+                if (!slugCheck.available) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `URL no disponible: ${slugCheck.reason}`,
+                        code: 'SLUG_NOT_AVAILABLE',
+                    });
+                }
+
+                validatedSlug = customSlug.trim().toLowerCase();
+            }
+
             // Parsear stickers
             const parsedStickers = safeJsonParse(selectedStickers);
 
@@ -168,12 +228,14 @@ class PageController {
                 backgroundMusic: isPro ? (backgroundMusic || 'none') : 'none',
                 selectedStickers: parsedStickers,
                 showWatermark: isPro ? (showWatermark === 'false' ? false : true) : true,
+                // 🆕 Custom slug
+                customSlug: validatedSlug,
             };
 
             // ---- Procesar imágenes ----
             const files = req.files || {};
 
-            // Imagen de fondo (free y pro)
+            // Imagen de fondo
             if (req.file?.fieldname === 'backgroundImage' || files.backgroundImage?.[0]) {
                 const bgFile = files.backgroundImage?.[0] || req.file;
                 if (bgFile) {
@@ -186,7 +248,7 @@ class PageController {
                 }
             }
 
-            // Imágenes decorativas (free: 1, pro: 5)
+            // Imágenes decorativas
             const maxDecorative = isPro ? LIMITS.pro.maxDecorativeImages : LIMITS.free.maxDecorativeImages;
             const decorativeUrls = [];
 
@@ -225,6 +287,7 @@ class PageController {
                 data: {
                     _id: page._id,
                     shortId: page.shortId,
+                    customSlug: page.customSlug, // 🆕
                     url: page.getFullUrl(),
                     pageType: page.pageType,
                     createdAt: page.createdAt,
@@ -232,6 +295,16 @@ class PageController {
             });
         } catch (error) {
             console.error('Error creating page:', error);
+
+            // Manejar error de slug duplicado
+            if (error.code === 11000 && error.keyPattern?.customSlug) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Esta URL personalizada ya está en uso',
+                    code: 'SLUG_DUPLICATE',
+                });
+            }
+
             return res.status(500).json({
                 success: false,
                 message: 'Error al crear la página',
@@ -267,13 +340,15 @@ class PageController {
     }
 
     /**
-     * Obtener página pública por shortId (ACTUALIZADO con nuevos campos)
-     * GET /api/pages/public/:shortId
+     * 🆕 Obtener página pública por shortId O customSlug (ACTUALIZADO)
+     * GET /api/pages/public/:identifier
      */
     async getPageByShortId(req, res) {
         try {
-            const { shortId } = req.params;
-            const page = await Page.findOne({ shortId, isActive: true,isDeleted: { $ne: true } }).populate('userId', 'displayName');
+            const { shortId } = req.params; // Ahora puede ser shortId o customSlug
+
+            // Usar el nuevo método findByIdentifier
+            const page = await Page.findByIdentifier(shortId);
 
             if (!page) {
                 return res.status(404).json({
@@ -297,6 +372,7 @@ class PageController {
                     pageType: page.pageType,
                     theme: page.theme,
                     backgroundColor: page.backgroundColor,
+                    customSlug: page.customSlug, // 🆕
                     textColor: page.textColor,
                     accentColor: page.accentColor,
                     // Nuevos campos
@@ -308,6 +384,8 @@ class PageController {
                     animation: page.animation,
                     backgroundMusic: page.backgroundMusic,
                     showWatermark: page.showWatermark,
+                    // 🆕 Custom slug
+                    customSlug: page.customSlug,
                     // PRO
                     customHTML: page.customHTML,
                     customCSS: page.customCSS,
@@ -326,13 +404,15 @@ class PageController {
     }
 
     /**
-     * Responder a una página (sin cambios)
+     * Responder a una página
      */
     async respondToPage(req, res) {
         try {
             const { shortId } = req.params;
             const { answer } = req.body;
-            const page = await Page.findOne({ shortId, isActive: true });
+
+            // Buscar por shortId o customSlug
+            const page = await Page.findByIdentifier(shortId);
 
             if (!page) {
                 return res.status(404).json({ success: false, message: 'Página no encontrada' });
@@ -361,7 +441,7 @@ class PageController {
     }
 
     /**
-     * Obtener páginas del usuario (sin cambios relevantes)
+     * Obtener páginas del usuario (ACTUALIZADO con customSlug)
      */
     async getUserPages(req, res) {
         try {
@@ -371,7 +451,7 @@ class PageController {
             const skip = (page - 1) * limit;
             const sortOrder = order === 'asc' ? 1 : -1;
 
-            const pages = await Page.find({ userId: user._id,isDeleted: { $ne: true } })
+            const pages = await Page.find({ userId: user._id, isDeleted: { $ne: true } })
                 .sort({ [sortBy]: sortOrder })
                 .skip(skip)
                 .limit(parseInt(limit))
@@ -382,11 +462,12 @@ class PageController {
             const pagesWithStats = pages.map((p) => {
                 const yesCount = p.responses.filter((r) => r.answer === 'yes').length;
                 const noCount = p.responses.filter((r) => r.answer === 'no').length;
-
+                const identifier = p.customSlug || p.shortId; // 🆕
                 return {
                     _id: p._id,
                     shortId: p.shortId,
-                    url: `${process.env.FRONTEND_URL}/p/${p.shortId}`,
+                    customSlug: p.customSlug, // 🆕
+                    url: `${process.env.FRONTEND_URL}/p/${identifier}`, // 🆕
                     title: p.title,
                     recipientName: p.recipientName,
                     pageType: p.pageType,

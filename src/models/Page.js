@@ -32,9 +32,18 @@ const responseSchema = new mongoose.Schema(
     { _id: true }
 );
 
+// Slugs reservados que no se pueden usar
+const RESERVED_SLUGS = [
+    'admin', 'api', 'dashboard', 'login', 'signup', 'create', 'edit',
+    'delete', 'update', 'settings', 'profile', 'pages', 'public',
+    'upgrade', 'pro', 'pricing', 'contact', 'about', 'terms', 'privacy',
+    'help', 'support', 'docs', 'blog', 'home', 'index', 'my-pages',
+    'stats', 'details', 'respond', 'toggle'
+];
+
 const pageSchema = new mongoose.Schema(
     {
-        // ID único para la URL
+        // ID único para la URL (autogenerado)
         shortId: {
             type: String,
             required: true,
@@ -42,6 +51,25 @@ const pageSchema = new mongoose.Schema(
             default: () => nanoid(10),
             index: true,
         },
+
+        // 🆕 NUEVO: Slug personalizado (solo PRO)
+        customSlug: {
+            type: String,
+            default: null,
+            unique: true,
+            sparse: true, // permite nulls múltiples
+            lowercase: true,
+            trim: true,
+            validate: {
+                validator: function (v) {
+                    if (!v) return true; // null es válido
+                    // Solo letras, números y guiones, entre 3-30 caracteres
+                    return /^[a-z0-9-]{3,30}$/.test(v);
+                },
+                message: 'El slug debe contener solo letras minúsculas, números y guiones (3-30 caracteres)'
+            }
+        },
+
         isDeleted: {
             type: Boolean,
             default: false,
@@ -137,7 +165,7 @@ const pageSchema = new mongoose.Schema(
         },
 
         // ============================================
-        // TIPOGRAFÍA (NUEVO)
+        // TIPOGRAFÍA
         // ============================================
         titleFont: {
             type: String,
@@ -151,7 +179,7 @@ const pageSchema = new mongoose.Schema(
         },
 
         // ============================================
-        // IMÁGENES (NUEVO)
+        // IMÁGENES
         // ============================================
         backgroundImageUrl: {
             type: String,
@@ -162,14 +190,14 @@ const pageSchema = new mongoose.Schema(
             default: [],
             validate: {
                 validator: function (v) {
-                    return v.length <= 5; // máximo 5 imágenes decorativas
+                    return v.length <= 5;
                 },
                 message: 'Máximo 5 imágenes decorativas',
             },
         },
 
         // ============================================
-        // STICKERS (NUEVO)
+        // STICKERS
         // ============================================
         selectedStickers: {
             type: [String],
@@ -183,7 +211,7 @@ const pageSchema = new mongoose.Schema(
         },
 
         // ============================================
-        // ANIMACIONES (NUEVO)
+        // ANIMACIONES
         // ============================================
         animation: {
             type: String,
@@ -196,7 +224,7 @@ const pageSchema = new mongoose.Schema(
         },
 
         // ============================================
-        // MÚSICA (NUEVO - solo PRO)
+        // MÚSICA (solo PRO)
         // ============================================
         backgroundMusic: {
             type: String,
@@ -212,7 +240,7 @@ const pageSchema = new mongoose.Schema(
         // ============================================
         showWatermark: {
             type: Boolean,
-            default: true, // free siempre true, PRO puede quitar
+            default: true,
         },
 
         // ============================================
@@ -245,13 +273,50 @@ const pageSchema = new mongoose.Schema(
 
 // Índices
 pageSchema.index({ shortId: 1 });
+pageSchema.index({ customSlug: 1 });
 pageSchema.index({ userId: 1, createdAt: -1 });
 pageSchema.index({ isActive: 1, expiresAt: 1 });
 
-// Método para generar URL completa
+// 🆕 Método para generar URL completa (actualizado para soportar custom slug)
 pageSchema.methods.getFullUrl = function () {
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    return `${baseUrl}/p/${this.shortId}`;
+    const identifier = this.customSlug || this.shortId;
+    return `${baseUrl}/p/${identifier}`;
+};
+
+// 🆕 Método estático para validar disponibilidad de slug
+pageSchema.statics.isSlugAvailable = async function (slug) {
+    if (!slug) return { available: false, reason: 'Slug vacío' };
+
+    // Validar formato
+    if (!/^[a-z0-9-]{3,30}$/.test(slug)) {
+        return { available: false, reason: 'Formato inválido (3-30 caracteres, solo minúsculas, números y guiones)' };
+    }
+
+    // Verificar slugs reservados
+    if (RESERVED_SLUGS.includes(slug.toLowerCase())) {
+        return { available: false, reason: 'Slug reservado por el sistema' };
+    }
+
+    // Verificar si ya existe
+    const existing = await this.findOne({ customSlug: slug, isDeleted: { $ne: true } });
+    if (existing) {
+        return { available: false, reason: 'Ya está en uso' };
+    }
+
+    return { available: true };
+};
+
+// 🆕 Método estático para buscar por shortId O customSlug
+pageSchema.statics.findByIdentifier = async function (identifier) {
+    return await this.findOne({
+        $or: [
+            { shortId: identifier },
+            { customSlug: identifier }
+        ],
+        isActive: true,
+        isDeleted: { $ne: true }
+    }).populate('userId', 'displayName');
 };
 
 // Método para incrementar vistas

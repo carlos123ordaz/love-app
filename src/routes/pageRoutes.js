@@ -16,7 +16,7 @@ const router = express.Router();
 
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB por archivo
+    limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
         if (allowedMimes.includes(file.mimetype)) {
@@ -27,7 +27,6 @@ const upload = multer({
     },
 });
 
-// Configuración de campos para múltiples archivos
 const uploadFields = upload.fields([
     { name: 'backgroundImage', maxCount: 1 },
     { name: 'referenceImage', maxCount: 1 },
@@ -38,9 +37,14 @@ const uploadFields = upload.fields([
     { name: 'decorativeImage_4', maxCount: 1 },
 ]);
 
-// === RUTAS ESTÁTICAS ===
+// === RUTAS ESTÁTICAS (ORDEN IMPORTA) ===
 
-// POST /api/pages - Crear página (ACTUALIZADO con múltiples archivos)
+// 🆕 NUEVO: Verificar disponibilidad de slug personalizado (debe ir ANTES de otras rutas)
+router.get('/check-slug/:slug', authenticate, (req, res) =>
+    pageController.checkSlugAvailability(req, res)
+);
+
+// POST /api/pages - Crear página
 router.post(
     '/',
     authenticate,
@@ -60,7 +64,7 @@ router.get('/stats', authenticate, (req, res) => pageControllerExtended.getUserS
 
 // === RUTAS CON /public/ ===
 
-// GET /api/pages/public/:shortId
+// GET /api/pages/public/:shortId (ahora soporta shortId O customSlug)
 router.get('/public/:shortId', optionalAuth, (req, res) => pageController.getPageByShortId(req, res));
 
 // POST /api/pages/public/:shortId/respond
