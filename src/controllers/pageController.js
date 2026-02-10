@@ -228,10 +228,10 @@ class PageController {
                 backgroundMusic: isPro ? (backgroundMusic || 'none') : 'none',
                 selectedStickers: parsedStickers,
                 showWatermark: isPro ? (showWatermark === 'false' ? false : true) : true,
-                // 🆕 Custom slug
-                customSlug: validatedSlug,
             };
-
+            if (validatedSlug) {
+                pageData.customSlug = validatedSlug;
+            }
             // ---- Procesar imágenes ----
             const files = req.files || {};
 

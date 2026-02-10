@@ -362,6 +362,9 @@ pageSchema.pre('save', async function (next) {
     if (!this.shortId) {
         this.shortId = nanoid(10);
     }
+    if (this.customSlug === '' || this.customSlug === undefined) {
+        this.customSlug = null;
+    }
     next();
 });
 
