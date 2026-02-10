@@ -56,8 +56,6 @@ const pageSchema = new mongoose.Schema(
         customSlug: {
             type: String,
             default: null,
-            unique: true,
-            sparse: true, // permite nulls múltiples
             lowercase: true,
             trim: true,
             validate: {
@@ -273,7 +271,7 @@ const pageSchema = new mongoose.Schema(
 
 // Índices
 pageSchema.index({ shortId: 1 });
-pageSchema.index({ customSlug: 1 });
+pageSchema.index({ customSlug: 1 }, { unique: true, sparse: true });
 pageSchema.index({ userId: 1, createdAt: -1 });
 pageSchema.index({ isActive: 1, expiresAt: 1 });
 
@@ -362,8 +360,8 @@ pageSchema.pre('save', async function (next) {
     if (!this.shortId) {
         this.shortId = nanoid(10);
     }
-    if (this.customSlug === '' || this.customSlug === undefined) {
-        this.customSlug = null;
+    if (!this.customSlug) {
+        this.customSlug = undefined;
     }
     next();
 });
