@@ -43,15 +43,80 @@ const userSchema = new mongoose.Schema(
             type: Date,
             default: Date.now,
         },
-        // Historial de pagos
+        // Historial de pagos - ACTUALIZADO
         payments: [
             {
-                paymentId: String,
-                amount: Number,
-                currency: String,
-                status: String,
-                date: Date,
-                mercadoPagoId: String,
+                // ID único del pago (puede ser de MercadoPago o PayPal)
+                paymentId: {
+                    type: String,
+                    required: true,
+                },
+                // Monto del pago
+                amount: {
+                    type: Number,
+                    required: true,
+                },
+                // Moneda (USD, PEN, etc.)
+                currency: {
+                    type: String,
+                    required: true,
+                    default: 'USD',
+                },
+                // Estado del pago (approved, completed, pending, etc.)
+                status: {
+                    type: String,
+                    required: true,
+                },
+                // Fecha del pago
+                date: {
+                    type: Date,
+                    required: true,
+                    default: Date.now,
+                },
+                // Proveedor del pago
+                provider: {
+                    type: String,
+                    enum: ['mercadopago', 'paypal', 'simulation'],
+                    required: true,
+                    default: 'mercadopago',
+                },
+                // IDs específicos de cada proveedor
+                mercadoPagoId: {
+                    type: String,
+                    default: null,
+                },
+                paypalOrderId: {
+                    type: String,
+                    default: null,
+                },
+                // Detalles adicionales del pago
+                statusDetail: {
+                    type: String,
+                    default: null,
+                },
+                paymentMethod: {
+                    type: String,
+                    default: null,
+                },
+                paymentType: {
+                    type: String,
+                    default: null,
+                },
+                // Información del pagador
+                payer: {
+                    email: {
+                        type: String,
+                        default: null,
+                    },
+                    name: {
+                        type: String,
+                        default: null,
+                    },
+                    payerId: {
+                        type: String,
+                        default: null,
+                    },
+                },
             },
         ],
     },
@@ -80,6 +145,28 @@ userSchema.methods.isProActive = function () {
 userSchema.methods.updateLastLogin = async function () {
     this.lastLogin = new Date();
     await this.save();
+};
+
+// 🆕 NUEVO: Método para obtener último pago
+userSchema.methods.getLastPayment = function () {
+    if (!this.payments || this.payments.length === 0) return null;
+    return this.payments[this.payments.length - 1];
+};
+
+// 🆕 NUEVO: Método para obtener pagos por proveedor
+userSchema.methods.getPaymentsByProvider = function (provider) {
+    if (!this.payments) return [];
+    return this.payments.filter(p => p.provider === provider);
+};
+
+// 🆕 NUEVO: Método para verificar si ya tiene un pago con un ID específico
+userSchema.methods.hasPayment = function (paymentId) {
+    if (!this.payments) return false;
+    return this.payments.some(
+        p => p.paymentId === paymentId ||
+            p.mercadoPagoId === paymentId ||
+            p.paypalOrderId === paymentId
+    );
 };
 
 userSchema.set('toJSON', {

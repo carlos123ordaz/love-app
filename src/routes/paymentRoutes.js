@@ -4,19 +4,45 @@ import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
-/**
- * @route   POST /api/payments/create-preference
- * @desc    Crear preferencia de pago para plan PRO
- * @access  Private
- */
-router.post('/create-preference', authenticate, paymentController.createPreference);
+// ============================================================
+// MERCADO PAGO
+// ============================================================
 
 /**
- * @route   GET /api/payments/:paymentId/status
+ * @route   POST /api/payments/mercadopago/create-preference
+ * @desc    Crear preferencia de pago MercadoPago para plan PRO
+ * @access  Private
+ */
+router.post('/mercadopago/create-preference', authenticate, paymentController.createMercadoPagoPreference);
+
+// ============================================================
+// PAYPAL
+// ============================================================
+
+/**
+ * @route   POST /api/payments/paypal/create-order
+ * @desc    Crear orden de PayPal para plan PRO
+ * @access  Private
+ */
+router.post('/paypal/create-order', authenticate, paymentController.createPayPalOrder);
+
+/**
+ * @route   POST /api/payments/paypal/capture/:orderId
+ * @desc    Capturar pago de PayPal después de la aprobación
+ * @access  Private
+ */
+router.post('/paypal/capture/:orderId', authenticate, paymentController.capturePayPalPayment);
+
+// ============================================================
+// RUTAS COMUNES
+// ============================================================
+
+/**
+ * @route   GET /api/payments/:provider/:paymentId/status
  * @desc    Verificar estado de un pago
  * @access  Private
  */
-router.get('/:paymentId/status', authenticate, paymentController.checkPaymentStatus);
+router.get('/:provider/:paymentId/status', authenticate, paymentController.checkPaymentStatus);
 
 /**
  * @route   GET /api/payments/history
@@ -33,5 +59,16 @@ router.get('/history', authenticate, paymentController.getPaymentHistory);
 if (process.env.NODE_ENV !== 'production') {
     router.post('/simulate-success', authenticate, paymentController.simulatePaymentSuccess);
 }
+
+// ============================================================
+// COMPATIBILIDAD CON VERSIÓN ANTERIOR (Opcional)
+// ============================================================
+
+/**
+ * @route   POST /api/payments/create-preference
+ * @desc    Alias para MercadoPago (retrocompatibilidad)
+ * @access  Private
+ */
+router.post('/create-preference', authenticate, paymentController.createMercadoPagoPreference);
 
 export default router;
