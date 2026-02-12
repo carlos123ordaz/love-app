@@ -386,7 +386,7 @@ class PaymentController {
             const mockPayment = {
                 paymentId: 'mock-' + Date.now(),
                 mercadoPagoId: 'mock-' + Date.now(),
-                amount: 1.39,
+                amount: 1.75,
                 currency: 'USD',
                 status: 'approved',
                 statusDetail: 'accredited',

@@ -45,11 +45,11 @@ class PayPalService {
                         soft_descriptor: 'LOVEPAGES PRO',
                         amount: {
                             currency_code: 'USD',
-                            value: '1.39',
+                            value: '1.75',
                             breakdown: {
                                 item_total: {
                                     currency_code: 'USD',
-                                    value: '1.39',
+                                    value: '1.75',
                                 },
                             },
                         },
@@ -59,7 +59,7 @@ class PayPalService {
                                 description: 'Acceso permanente a páginas ilimitadas con IA',
                                 unit_amount: {
                                     currency_code: 'USD',
-                                    value: '1.39',
+                                    value: '1.75',
                                 },
                                 quantity: '1',
                                 category: 'DIGITAL_GOODS',
