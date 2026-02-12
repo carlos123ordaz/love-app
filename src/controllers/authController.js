@@ -19,11 +19,12 @@ class AuthController {
                     photoURL: user.photoURL,
                     isPro: user.isProActive(),
                     pagesCreated: user.pagesCreated,
-                    canCreatePage: user.isPro ? true : user.pagesCreated < 1,
-                    remainingPages: user.isPro ? 'unlimited' : Math.max(0, 1 - user.pagesCreated),
+                    canCreatePage: user.isPro ? true : user.pagesCreated < (1 + (user.bonusPages || 0)),
+                    remainingPages: user.isPro ? 'unlimited' : Math.max(0, (1 + (user.bonusPages || 0)) - user.pagesCreated),
                     lastLogin: user.lastLogin,
                     createdAt: user.createdAt,
                     isAdmin: user.isAdmin,
+                    bonusPages: user.bonusPages
                 },
             });
         } catch (error) {

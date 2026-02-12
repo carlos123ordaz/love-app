@@ -43,80 +43,43 @@ const userSchema = new mongoose.Schema(
             type: Date,
             default: Date.now,
         },
-        // Historial de pagos - ACTUALIZADO
+        // Historial de pagos
         payments: [
             {
-                // ID único del pago (puede ser de MercadoPago o PayPal)
-                paymentId: {
-                    type: String,
-                    required: true,
-                },
-                // Monto del pago
-                amount: {
-                    type: Number,
-                    required: true,
-                },
-                // Moneda (USD, PEN, etc.)
-                currency: {
-                    type: String,
-                    required: true,
-                    default: 'USD',
-                },
-                // Estado del pago (approved, completed, pending, etc.)
-                status: {
-                    type: String,
-                    required: true,
-                },
-                // Fecha del pago
-                date: {
-                    type: Date,
-                    required: true,
-                    default: Date.now,
-                },
-                // Proveedor del pago
+                paymentId: { type: String, required: true },
+                amount: { type: Number, required: true },
+                currency: { type: String, required: true, default: 'USD' },
+                status: { type: String, required: true },
+                date: { type: Date, required: true, default: Date.now },
                 provider: {
                     type: String,
                     enum: ['mercadopago', 'paypal', 'simulation'],
                     required: true,
                     default: 'mercadopago',
                 },
-                // IDs específicos de cada proveedor
-                mercadoPagoId: {
-                    type: String,
-                    default: null,
-                },
-                paypalOrderId: {
-                    type: String,
-                    default: null,
-                },
-                // Detalles adicionales del pago
-                statusDetail: {
-                    type: String,
-                    default: null,
-                },
-                paymentMethod: {
-                    type: String,
-                    default: null,
-                },
-                paymentType: {
-                    type: String,
-                    default: null,
-                },
-                // Información del pagador
+                mercadoPagoId: { type: String, default: null },
+                paypalOrderId: { type: String, default: null },
+                statusDetail: { type: String, default: null },
+                paymentMethod: { type: String, default: null },
+                paymentType: { type: String, default: null },
                 payer: {
-                    email: {
-                        type: String,
-                        default: null,
-                    },
-                    name: {
-                        type: String,
-                        default: null,
-                    },
-                    payerId: {
-                        type: String,
-                        default: null,
-                    },
+                    email: { type: String, default: null },
+                    name: { type: String, default: null },
+                    payerId: { type: String, default: null },
                 },
+            },
+        ],
+        // Recompensas por anuncios
+        bonusPages: {
+            type: Number,
+            default: 0,
+        },
+        rewardHistory: [
+            {
+                date: { type: Date, default: Date.now },
+                type: { type: String, enum: ['ad_reward'], default: 'ad_reward' },
+                pagesEarned: { type: Number, default: 1 },
+                completed: { type: Boolean, default: false },
             },
         ],
     },
@@ -128,47 +91,70 @@ const userSchema = new mongoose.Schema(
 // Índices compuestos
 userSchema.index({ email: 1, firebaseUid: 1 });
 
-// Método virtual para verificar si el usuario puede crear más páginas
+// ============================================
+// VIRTUALS
+// ============================================
+
+// Verificar si el usuario puede crear más páginas
 userSchema.virtual('canCreatePage').get(function () {
     if (this.isPro) return true;
-    return this.pagesCreated < 1;
+    const totalAllowed = 1 + (this.bonusPages || 0);
+    return this.pagesCreated < totalAllowed;
 });
 
-// Método para verificar si el PRO está activo
+// Total de páginas permitidas (para mostrar en el frontend)
+userSchema.virtual('totalAllowedPages').get(function () {
+    if (this.isPro) return Infinity;
+    return 1 + (this.bonusPages || 0);
+});
+
+// Anuncios vistos hoy (para el frontend)
+userSchema.virtual('dailyAdViews').get(function () {
+    if (!this.rewardHistory || this.rewardHistory.length === 0) return 0;
+    const today = new Date().toISOString().split('T')[0];
+    return this.rewardHistory.filter(
+        (r) => r.date && r.date.toISOString().split('T')[0] === today && r.completed
+    ).length;
+});
+
+// ============================================
+// METHODS
+// ============================================
+
 userSchema.methods.isProActive = function () {
     if (!this.isPro) return false;
-    if (!this.proExpiresAt) return true; // PRO permanente
+    if (!this.proExpiresAt) return true;
     return this.proExpiresAt > new Date();
 };
 
-// Método para actualizar último login
 userSchema.methods.updateLastLogin = async function () {
     this.lastLogin = new Date();
     await this.save();
 };
 
-// 🆕 NUEVO: Método para obtener último pago
 userSchema.methods.getLastPayment = function () {
     if (!this.payments || this.payments.length === 0) return null;
     return this.payments[this.payments.length - 1];
 };
 
-// 🆕 NUEVO: Método para obtener pagos por proveedor
 userSchema.methods.getPaymentsByProvider = function (provider) {
     if (!this.payments) return [];
-    return this.payments.filter(p => p.provider === provider);
+    return this.payments.filter((p) => p.provider === provider);
 };
 
-// 🆕 NUEVO: Método para verificar si ya tiene un pago con un ID específico
 userSchema.methods.hasPayment = function (paymentId) {
     if (!this.payments) return false;
     return this.payments.some(
-        p => p.paymentId === paymentId ||
+        (p) =>
+            p.paymentId === paymentId ||
             p.mercadoPagoId === paymentId ||
             p.paypalOrderId === paymentId
     );
 };
 
+// ============================================
+// toJSON — incluir virtuals
+// ============================================
 userSchema.set('toJSON', {
     virtuals: true,
     transform: function (doc, ret) {

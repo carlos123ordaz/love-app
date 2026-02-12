@@ -11,6 +11,7 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import rewardsRoutes from './routes/rewards.js';
 
 dotenv.config();
 
@@ -60,6 +61,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/rewards', rewardsRoutes);
 // Ruta 404
 app.use('*', (req, res) => {
     res.status(404).json({

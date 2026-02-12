@@ -173,10 +173,10 @@ class PageController {
             }
 
             const isPro = user.isProActive();
-            if (!isPro && user.pagesCreated > 0) {
+            if (!isPro && !user.canCreatePage) {
                 return res.status(403).json({
                     success: false,
-                    message: 'Ya superó el límite de páginas gratuitas',
+                    message: 'Has alcanzado el límite de páginas. Ve un anuncio o pasa a PRO.',
                     code: 'PRO_REQUIRED',
                 });
             }
