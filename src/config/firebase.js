@@ -19,6 +19,7 @@ function initializeFirebase() {
         console.error('❌ Error initializing Firebase Admin:', error.message);
         throw error;
     }
+    
 }
 
 initializeFirebase();
