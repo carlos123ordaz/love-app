@@ -6,7 +6,7 @@ import validator from 'validator';
  */
 export const generalLimiter = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutos
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000,
     message: {
         success: false,
         message: 'Demasiadas solicitudes, por favor intenta más tarde',

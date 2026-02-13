@@ -28,6 +28,11 @@ const responseSchema = new mongoose.Schema(
             type: Date,
             default: Date.now,
         },
+        templateId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Template',
+            default: null,
+        },
     },
     { _id: true }
 );
