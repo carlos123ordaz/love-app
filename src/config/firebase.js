@@ -22,6 +22,7 @@ function initializeFirebase() {
     
 }
 
+//algunos cambios
 initializeFirebase();
 
 export default admin;
