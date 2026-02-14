@@ -13,7 +13,6 @@ class PaymentController {
      * POST /api/payments/mercadopago/create-preference
      */
     async createMercadoPagoPreference(req, res) {
-        console.log('MERCADOPAGO_ACCESS_TOKEN:', process.env.MERCADOPAGO_ACCESS_TOKEN);
         try {
             const user = req.user;
             if (user.isProActive()) {
@@ -135,7 +134,8 @@ class PaymentController {
     }
 
     /**
-     * Capturar pago de PayPal después de la aprobación
+     * ✅ FIX: Capturar pago de PayPal después de la aprobación
+     * Este endpoint es llamado por el frontend cuando PayPal redirige al usuario
      * POST /api/payments/paypal/capture/:orderId
      */
     async capturePayPalPayment(req, res) {
@@ -143,17 +143,36 @@ class PaymentController {
             const { orderId } = req.params;
             const user = req.user;
 
-            // Capturar el pago
-            const orderDetails = await paypalService.capturePayment(orderId);
+            // ✅ FIX: Primero verificar la orden antes de capturar
+            const orderCheck = await paypalService.getOrderDetails(orderId);
 
             // Verificar que la orden pertenezca al usuario
-            const customId = orderDetails.purchase_units?.[0]?.custom_id;
+            const customId = orderCheck.purchase_units?.[0]?.custom_id;
             if (customId !== user._id.toString()) {
                 return res.status(403).json({
                     success: false,
                     message: 'No tienes permiso para capturar este pago',
                 });
             }
+
+            // Si ya fue completada (por webhook u otra llamada), simplemente activar PRO
+            if (orderCheck.status === 'COMPLETED') {
+                if (paypalService.isPaymentCompleted(orderCheck)) {
+                    await this.activateProPlan(user, orderCheck, 'paypal');
+                    return res.json({
+                        success: true,
+                        message: '¡Pago completado! Plan PRO activado',
+                        data: {
+                            orderId: orderCheck.id,
+                            status: orderCheck.status,
+                            isPro: true,
+                        },
+                    });
+                }
+            }
+
+            // Capturar el pago
+            const orderDetails = await paypalService.capturePayment(orderId);
 
             // Verificar que el pago fue completado
             if (paypalService.isPaymentCompleted(orderDetails)) {
@@ -173,6 +192,9 @@ class PaymentController {
             return res.status(400).json({
                 success: false,
                 message: 'El pago no se completó correctamente',
+                data: {
+                    status: orderDetails.status,
+                },
             });
         } catch (error) {
             console.error('Error capturing PayPal payment:', error);
@@ -184,7 +206,7 @@ class PaymentController {
     }
 
     /**
-     * Webhook de PayPal
+     * ✅ FIX: Webhook de PayPal con verificación correcta
      * POST /api/webhooks/paypal
      */
     async handlePayPalWebhook(req, res) {
@@ -192,8 +214,8 @@ class PaymentController {
             // Responder rápido a PayPal
             res.status(200).send('OK');
 
-            // Verificar signature del webhook
-            const isValid = await paypalService.verifyWebhookSignature(req.headers, req.body);
+            // ✅ FIX: Verificar signature del webhook usando API REST
+            const isValid = await paypalService.verifyWebhookSignature(req.headers, req.rawBody || req.body);
 
             if (!isValid) {
                 console.error('❌ Invalid PayPal webhook signature');
@@ -230,7 +252,7 @@ class PaymentController {
     // ============================================================
 
     /**
-     * Activar plan PRO para un usuario
+     * ✅ FIX: Activar plan PRO con protección contra race conditions usando findOneAndUpdate
      */
     async activateProPlan(user, paymentInfo, provider = 'mercadopago') {
         try {
@@ -239,34 +261,56 @@ class PaymentController {
                     ? paymentInfo.id
                     : paymentInfo.id.toString();
 
-            // Verificar si el pago ya fue procesado
-            const paymentExists = user.payments.some(
-                (p) => p.paymentId === paymentId || p.mercadoPagoId === paymentId || p.paypalOrderId === paymentId
-            );
+            // ✅ FIX: Usar operación atómica para evitar race conditions
+            // entre el webhook y el capture del frontend
+            const existingUser = await User.findOne({
+                _id: user._id,
+                $or: [
+                    { 'payments.paymentId': paymentId },
+                    { 'payments.mercadoPagoId': paymentId },
+                    { 'payments.paypalOrderId': paymentId },
+                ],
+            });
 
-            if (paymentExists) {
+            if (existingUser) {
                 console.log('⚠️ Payment already processed:', paymentId);
                 return;
             }
 
-            // Activar plan PRO
-            user.isPro = true;
-            user.proExpiresAt = null; // PRO permanente
-
-            // Agregar pago al historial
+            // Formatear pago
             let formattedPayment;
             if (provider === 'paypal') {
                 formattedPayment = paypalService.formatPaymentData(paymentInfo);
             } else {
                 formattedPayment = mercadoPagoService.formatPaymentData(paymentInfo);
             }
-
             formattedPayment.provider = provider;
-            user.payments.push(formattedPayment);
 
-            await user.save();
+            // ✅ FIX: Operación atómica - solo actualiza si el pago NO existe aún
+            const result = await User.findOneAndUpdate(
+                {
+                    _id: user._id,
+                    'payments.paymentId': { $ne: paymentId },
+                    'payments.paypalOrderId': { $ne: paymentId },
+                    'payments.mercadoPagoId': { $ne: paymentId },
+                },
+                {
+                    $set: {
+                        isPro: true,
+                        proExpiresAt: null, // PRO permanente
+                    },
+                    $push: {
+                        payments: formattedPayment,
+                    },
+                },
+                { new: true }
+            );
 
-            console.log(`✅ PRO plan activated for user: ${user.email} (${provider})`);
+            if (result) {
+                console.log(`✅ PRO plan activated for user: ${user.email} (${provider})`);
+            } else {
+                console.log(`ℹ️ PRO plan already active or payment already exists for: ${user.email}`);
+            }
         } catch (error) {
             console.error('Error activating PRO plan:', error);
             throw error;
@@ -287,7 +331,6 @@ class PaymentController {
             if (provider === 'paypal') {
                 paymentInfo = await paypalService.getOrderDetails(paymentId);
 
-                // Verificar que pertenezca al usuario
                 if (paymentInfo.purchase_units?.[0]?.custom_id !== user._id.toString()) {
                     return res.status(403).json({
                         success: false,
@@ -307,7 +350,6 @@ class PaymentController {
             } else if (provider === 'mercadopago') {
                 paymentInfo = await mercadoPagoService.getPaymentInfo(paymentId);
 
-                // Verificar que pertenezca al usuario
                 if (paymentInfo.external_reference !== user._id.toString()) {
                     return res.status(403).json({
                         success: false,

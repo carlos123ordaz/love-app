@@ -18,11 +18,11 @@ dotenv.config();
 
 const app = express();
 
-
 connectDB();
 
 app.use(helmet());
 app.set('trust proxy', 1);
+
 // CORS
 const corsOptions = {
     origin: [process.env.FRONTEND_URL, 'http://localhost:3000', 'http://localhost:3001'],
@@ -31,7 +31,12 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Body parser
+// ✅ FIX: Registrar webhook routes ANTES del body parser global
+// Esto permite que el webhook de PayPal reciba el raw body para verificar la firma
+// Sin esto, express.json() parsea el body antes de que llegue al webhook handler
+app.use('/api/webhooks', webhookRoutes);
+
+// Body parser (después de webhooks)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -59,11 +64,12 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/pages', pageRoutes);
 app.use('/api/payments', paymentRoutes);
-app.use('/api/webhooks', webhookRoutes);
+// ✅ webhookRoutes ya registrado arriba antes del body parser
 app.use('/api/contact', contactRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/rewards', rewardsRoutes);
 app.use('/api/templates', templateRoutes);
+
 // Ruta 404
 app.use('*', (req, res) => {
     res.status(404).json({
@@ -76,7 +82,6 @@ app.use('*', (req, res) => {
 app.use((err, req, res, next) => {
     console.error('Error:', err);
 
-    // Error de Multer (subida de archivos)
     if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({
             success: false,
@@ -91,7 +96,6 @@ app.use((err, req, res, next) => {
         });
     }
 
-    // Error de validación de Mongoose
     if (err.name === 'ValidationError') {
         const errors = Object.values(err.errors).map((e) => e.message);
         return res.status(400).json({
@@ -101,7 +105,6 @@ app.use((err, req, res, next) => {
         });
     }
 
-    // Error de duplicado en MongoDB
     if (err.code === 11000) {
         return res.status(400).json({
             success: false,
@@ -109,7 +112,6 @@ app.use((err, req, res, next) => {
         });
     }
 
-    // Error genérico
     res.status(err.status || 500).json({
         success: false,
         message: err.message || 'Error interno del servidor',
@@ -117,10 +119,8 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Puerto
 const PORT = process.env.PORT || 5000;
 
-// Iniciar servidor
 app.listen(PORT, () => {
     console.log(`
 ╔════════════════════════════════════════════╗
@@ -133,10 +133,8 @@ app.listen(PORT, () => {
   `);
 });
 
-// Manejo de errores no capturados
 process.on('unhandledRejection', (err) => {
     console.error('❌ Unhandled Rejection:', err);
-    // Cerrar servidor y salir del proceso
     process.exit(1);
 });
 
