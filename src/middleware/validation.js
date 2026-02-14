@@ -6,7 +6,7 @@ import validator from 'validator';
  */
 export const generalLimiter = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutos
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000,
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 10000,
     message: {
         success: false,
         message: 'Demasiadas solicitudes, por favor intenta más tarde',
@@ -20,7 +20,7 @@ export const generalLimiter = rateLimit({
  */
 export const createPageLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hora
-    max: 20, // 20 páginas por hora
+    max: 200, // 20 páginas por hora
     message: {
         success: false,
         message: 'Has excedido el límite de creación de páginas. Intenta más tarde.',
@@ -33,7 +33,7 @@ export const createPageLimiter = rateLimit({
  */
 export const responsePageLimiter = rateLimit({
     windowMs: 5 * 60 * 1000, // 5 minutos
-    max: 10, // 10 respuestas por 5 minutos
+    max: 100, // 10 respuestas por 5 minutos
     message: {
         success: false,
         message: 'Demasiadas respuestas. Espera un momento antes de intentar nuevamente.',
