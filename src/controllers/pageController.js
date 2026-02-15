@@ -12,7 +12,7 @@ const PRO_FONTS = [
 const PRO_STICKERS = ['star', 'fire', 'butterfly', 'teddy', 'chocolate', 'champagne', 'moon', 'rainbow'];
 const PRO_MUSIC = ['romantic-piano', 'acoustic-guitar', 'love-song', 'music-box', 'orchestra'];
 
-// Límites FREE vs PRO
+// Límites FREE vs PRO (solo para cantidad de items, NO para páginas)
 const LIMITS = {
     free: {
         maxDecorativeImages: 1,
@@ -80,7 +80,7 @@ class PageController {
                 errors.push(`Máximo ${LIMITS.free.maxStickers} stickers en plan gratuito`);
             }
 
-            // 🆕 Custom slug solo para PRO
+            // Custom slug solo para PRO
             if (body.customSlug) {
                 errors.push('Las URLs personalizadas requieren plan PRO');
             }
@@ -90,7 +90,7 @@ class PageController {
     }
 
     /**
-     * 🆕 NUEVO: Verificar disponibilidad de slug personalizado
+     * Verificar disponibilidad de slug personalizado
      * GET /api/pages/check-slug/:slug
      */
     async checkSlugAvailability(req, res) {
@@ -123,7 +123,7 @@ class PageController {
     }
 
     /**
-     * Crear nueva página (ACTUALIZADO con customSlug)
+     * Crear nueva página (sin límite de páginas, solo validación de features PRO)
      * POST /api/pages
      */
     async createPage(req, res) {
@@ -141,14 +141,12 @@ class PageController {
                 backgroundColor,
                 textColor,
                 accentColor,
-                // Nuevos campos
                 titleFont,
                 bodyFont,
                 animation,
                 backgroundMusic,
                 selectedStickers,
                 showWatermark,
-                // 🆕 NUEVO: Custom slug
                 customSlug,
             } = req.body;
 
@@ -173,15 +171,8 @@ class PageController {
             }
 
             const isPro = user.isProActive();
-            if (!isPro && !user.canCreatePage) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Has alcanzado el límite de páginas. Ve un anuncio o pasa a PRO.',
-                    code: 'PRO_REQUIRED',
-                });
-            }
 
-            // 🆕 Validar customSlug si se proporciona
+            // Validar customSlug si se proporciona
             let validatedSlug = null;
             if (customSlug && customSlug.trim()) {
                 if (!isPro) {
@@ -221,7 +212,6 @@ class PageController {
                 backgroundColor: backgroundColor || '#ff69b4',
                 textColor: textColor || '#ffffff',
                 accentColor: accentColor || '#ff1493',
-                // Nuevos campos
                 titleFont: titleFont || 'Dancing Script',
                 bodyFont: bodyFont || 'Quicksand',
                 animation: animation || 'none',
@@ -232,6 +222,7 @@ class PageController {
             if (validatedSlug) {
                 pageData.customSlug = validatedSlug;
             }
+
             // ---- Procesar imágenes ----
             const files = req.files || {};
 
@@ -277,7 +268,7 @@ class PageController {
 
             const page = await Page.create(pageData);
 
-            // Incrementar contador
+            // Incrementar contador (estadística solamente)
             user.pagesCreated += 1;
             await user.save();
 
@@ -287,7 +278,7 @@ class PageController {
                 data: {
                     _id: page._id,
                     shortId: page.shortId,
-                    customSlug: page.customSlug, // 🆕
+                    customSlug: page.customSlug,
                     url: page.getFullUrl(),
                     pageType: page.pageType,
                     createdAt: page.createdAt,
@@ -340,14 +331,13 @@ class PageController {
     }
 
     /**
-     * 🆕 Obtener página pública por shortId O customSlug (ACTUALIZADO)
+     * Obtener página pública por shortId O customSlug
      * GET /api/pages/public/:identifier
      */
     async getPageByShortId(req, res) {
         try {
-            const { shortId } = req.params; // Ahora puede ser shortId o customSlug
+            const { shortId } = req.params;
 
-            // Usar el nuevo método findByIdentifier
             const page = await Page.findByIdentifier(shortId);
 
             if (!page) {
@@ -372,10 +362,8 @@ class PageController {
                     pageType: page.pageType,
                     theme: page.theme,
                     backgroundColor: page.backgroundColor,
-                    customSlug: page.customSlug, // 🆕
                     textColor: page.textColor,
                     accentColor: page.accentColor,
-                    // Nuevos campos
                     titleFont: page.titleFont,
                     bodyFont: page.bodyFont,
                     backgroundImageUrl: page.backgroundImageUrl,
@@ -384,9 +372,7 @@ class PageController {
                     animation: page.animation,
                     backgroundMusic: page.backgroundMusic,
                     showWatermark: page.showWatermark,
-                    // 🆕 Custom slug
                     customSlug: page.customSlug,
-                    // PRO
                     customHTML: page.customHTML,
                     customCSS: page.customCSS,
                     referenceImageUrl: page.referenceImageUrl,
@@ -411,7 +397,6 @@ class PageController {
             const { shortId } = req.params;
             const { answer } = req.body;
 
-            // Buscar por shortId o customSlug
             const page = await Page.findByIdentifier(shortId);
 
             if (!page) {
@@ -441,7 +426,7 @@ class PageController {
     }
 
     /**
-     * Obtener páginas del usuario (ACTUALIZADO con customSlug)
+     * Obtener páginas del usuario
      */
     async getUserPages(req, res) {
         try {
@@ -462,12 +447,12 @@ class PageController {
             const pagesWithStats = pages.map((p) => {
                 const yesCount = p.responses.filter((r) => r.answer === 'yes').length;
                 const noCount = p.responses.filter((r) => r.answer === 'no').length;
-                const identifier = p.customSlug || p.shortId; // 🆕
+                const identifier = p.customSlug || p.shortId;
                 return {
                     _id: p._id,
                     shortId: p.shortId,
-                    customSlug: p.customSlug, // 🆕
-                    url: `${process.env.FRONTEND_URL}/p/${identifier}`, // 🆕
+                    customSlug: p.customSlug,
+                    url: `${process.env.FRONTEND_URL}/p/${identifier}`,
                     title: p.title,
                     recipientName: p.recipientName,
                     pageType: p.pageType,

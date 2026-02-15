@@ -11,7 +11,6 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
-import rewardsRoutes from './routes/rewards.js';
 import templateRoutes from './routes/templateRoutes.js';
 
 dotenv.config();
@@ -31,9 +30,7 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// ✅ FIX: Registrar webhook routes ANTES del body parser global
-// Esto permite que el webhook de PayPal reciba el raw body para verificar la firma
-// Sin esto, express.json() parsea el body antes de que llegue al webhook handler
+// Registrar webhook routes ANTES del body parser global
 app.use('/api/webhooks', webhookRoutes);
 
 // Body parser (después de webhooks)
@@ -64,10 +61,8 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/pages', pageRoutes);
 app.use('/api/payments', paymentRoutes);
-// ✅ webhookRoutes ya registrado arriba antes del body parser
 app.use('/api/contact', contactRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/rewards', rewardsRoutes);
 app.use('/api/templates', templateRoutes);
 
 // Ruta 404

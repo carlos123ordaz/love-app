@@ -28,11 +28,6 @@ const responseSchema = new mongoose.Schema(
             type: Date,
             default: Date.now,
         },
-        templateId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'Template',
-            default: null,
-        },
     },
     { _id: true }
 );
@@ -266,6 +261,11 @@ const pageSchema = new mongoose.Schema(
         },
         expiresAt: {
             type: Date,
+            default: null,
+        },
+          templateId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Template',
             default: null,
         },
     },

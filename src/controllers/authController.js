@@ -19,12 +19,9 @@ class AuthController {
                     photoURL: user.photoURL,
                     isPro: user.isProActive(),
                     pagesCreated: user.pagesCreated,
-                    canCreatePage: user.isPro ? true : user.pagesCreated < (1 + (user.bonusPages || 0)),
-                    remainingPages: user.isPro ? 'unlimited' : Math.max(0, (1 + (user.bonusPages || 0)) - user.pagesCreated),
                     lastLogin: user.lastLogin,
                     createdAt: user.createdAt,
                     isAdmin: user.isAdmin,
-                    bonusPages: user.bonusPages
                 },
             });
         } catch (error) {
@@ -135,11 +132,6 @@ class AuthController {
     async deleteAccount(req, res) {
         try {
             const user = req.user;
-
-            // Aquí podrías agregar lógica adicional:
-            // - Eliminar todas las páginas del usuario
-            // - Eliminar imágenes de Firebase Storage
-            // - Etc.
 
             await User.findByIdAndDelete(user._id);
 

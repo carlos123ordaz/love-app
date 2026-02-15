@@ -35,6 +35,7 @@ const userSchema = new mongoose.Schema(
             type: Boolean,
             default: false,
         },
+        // Se mantiene como estadística (no como límite)
         pagesCreated: {
             type: Number,
             default: 0,
@@ -69,19 +70,6 @@ const userSchema = new mongoose.Schema(
                 },
             },
         ],
-        // Recompensas por anuncios
-        bonusPages: {
-            type: Number,
-            default: 0,
-        },
-        rewardHistory: [
-            {
-                date: { type: Date, default: Date.now },
-                type: { type: String, enum: ['ad_reward'], default: 'ad_reward' },
-                pagesEarned: { type: Number, default: 1 },
-                completed: { type: Boolean, default: false },
-            },
-        ],
     },
     {
         timestamps: true,
@@ -90,32 +78,6 @@ const userSchema = new mongoose.Schema(
 
 // Índices compuestos
 userSchema.index({ email: 1, firebaseUid: 1 });
-
-// ============================================
-// VIRTUALS
-// ============================================
-
-// Verificar si el usuario puede crear más páginas
-userSchema.virtual('canCreatePage').get(function () {
-    if (this.isPro) return true;
-    const totalAllowed = 1 + (this.bonusPages || 0);
-    return this.pagesCreated < totalAllowed;
-});
-
-// Total de páginas permitidas (para mostrar en el frontend)
-userSchema.virtual('totalAllowedPages').get(function () {
-    if (this.isPro) return Infinity;
-    return 1 + (this.bonusPages || 0);
-});
-
-// Anuncios vistos hoy (para el frontend)
-userSchema.virtual('dailyAdViews').get(function () {
-    if (!this.rewardHistory || this.rewardHistory.length === 0) return 0;
-    const today = new Date().toISOString().split('T')[0];
-    return this.rewardHistory.filter(
-        (r) => r.date && r.date.toISOString().split('T')[0] === today && r.completed
-    ).length;
-});
 
 // ============================================
 // METHODS

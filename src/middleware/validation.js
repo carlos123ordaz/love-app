@@ -151,19 +151,6 @@ export const checkPageLimit = async (req, res, next) => {
         if (user.isProActive()) {
             return next();
         }
-
-        // Verificar límite de páginas gratuitas
-        const totalAllowed = 1 + (user.bonusPages || 0);
-        if (user.pagesCreated >= totalAllowed) {
-            return res.status(403).json({
-                success: false,
-                message: `Has alcanzado el límite de ${totalAllowed} página${totalAllowed !== 1 ? 's' : ''} gratuita${totalAllowed !== 1 ? 's' : ''}`,
-                code: 'PAGE_LIMIT_REACHED',
-                pagesCreated: user.pagesCreated,
-                limit: totalAllowed,
-            });
-        }
-
         next();
     } catch (error) {
         console.error('Error checking page limit:', error);

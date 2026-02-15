@@ -108,7 +108,6 @@ class TemplateController {
     /**
      * Subir imagen para un campo de plantilla (requiere PRO + auth)
      * POST /api/templates/:templateId/upload-image
-     * Body (multipart): image (file), fieldKey (string)
      */
     async uploadTemplateImage(req, res) {
         try {
@@ -132,7 +131,6 @@ class TemplateController {
                 });
             }
 
-            // Validar tipo de archivo
             if (!storageService.isValidImageType(req.file.mimetype)) {
                 return res.status(400).json({
                     success: false,
@@ -140,7 +138,6 @@ class TemplateController {
                 });
             }
 
-            // Validar tamaño
             if (!storageService.isValidFileSize(req.file.size)) {
                 return res.status(400).json({
                     success: false,
@@ -148,7 +145,6 @@ class TemplateController {
                 });
             }
 
-            // Verificar que la plantilla existe
             const template = await Template.findOne({
                 _id: templateId,
                 isActive: true,
@@ -161,7 +157,6 @@ class TemplateController {
                 });
             }
 
-            // Verificar que el fieldKey corresponde a un campo de tipo image_url
             const field = template.editableFields.find(
                 (f) => f.key === fieldKey && f.type === 'image_url'
             );
@@ -173,7 +168,6 @@ class TemplateController {
                 });
             }
 
-            // Validar tamaño máximo específico del campo si tiene imageConfig
             if (field.imageConfig?.maxSizeMB) {
                 const maxBytes = 15 * 1024 * 1024;
                 if (req.file.size > maxBytes) {
@@ -184,7 +178,6 @@ class TemplateController {
                 }
             }
 
-            // Subir a Google Cloud Storage
             const imageUrl = await storageService.uploadReferenceImage(
                 req.file.buffer,
                 `tpl_${templateId}_${fieldKey}_${req.file.originalname}`,
@@ -225,23 +218,8 @@ class TemplateController {
                 customSlug,
             } = req.body;
 
-            // Verificar PRO
-            if (!user.isProActive()) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Las plantillas requieren plan PRO para crear páginas',
-                    code: 'PRO_REQUIRED',
-                });
-            }
+            console.log('tem id: ', templateId);
 
-            // Verificar límite de páginas
-            if (!user.canCreatePage) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Has alcanzado el límite de páginas',
-                    code: 'PAGE_LIMIT',
-                });
-            }
 
             // Obtener plantilla
             const template = await Template.findOne({
@@ -255,21 +233,25 @@ class TemplateController {
                     message: 'Plantilla no encontrada',
                 });
             }
-
+            if (template.isPro && !user.isProActive()) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Esta plantilla requiere plan PRO',
+                    code: 'PRO_REQUIRED',
+                });
+            }
             // Validar campos requeridos
             for (const field of template.editableFields) {
                 if (field.required) {
                     const value = values[field.key];
 
                     if (field.type === 'image_url') {
-                        // Para imágenes requeridas: verificar que sea una URL válida
                         if (!value || !value.trim()) {
                             return res.status(400).json({
                                 success: false,
                                 message: `La imagen "${field.label}" es requerida`,
                             });
                         }
-                        // Validar que sea URL https
                         try {
                             const parsed = new URL(value.trim());
                             if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
@@ -285,7 +267,6 @@ class TemplateController {
                             });
                         }
                     } else {
-                        // Para campos de texto requeridos
                         if (!value || !value.trim()) {
                             return res.status(400).json({
                                 success: false,
@@ -299,7 +280,6 @@ class TemplateController {
             // Renderizar HTML/CSS con los valores del usuario
             const rendered = template.renderHtml(values || {});
 
-            // Extraer título del campo TITULO o usar el nombre de la plantilla
             const title = values.TITULO || values.TITLE || template.name;
 
             // Validar customSlug si se proporciona
@@ -337,9 +317,10 @@ class TemplateController {
                 pageData.customSlug = validatedSlug;
             }
 
+            console.log('page data: ', pageData);
             const page = await Page.create(pageData);
 
-            // Incrementar contadores
+            // Incrementar contadores (estadística)
             user.pagesCreated += 1;
             await user.save();
 
@@ -380,10 +361,6 @@ class TemplateController {
     // ENDPOINTS ADMIN
     // ============================================
 
-    /**
-     * Listar TODAS las plantillas (admin)
-     * GET /api/admin/templates
-     */
     async adminGetTemplates(req, res) {
         try {
             const templates = await Template.find()
@@ -403,27 +380,13 @@ class TemplateController {
         }
     }
 
-    /**
-     * Crear nueva plantilla (admin)
-     * POST /api/admin/templates
-     */
     async adminCreateTemplate(req, res) {
         try {
             const {
-                name,
-                description,
-                previewImageUrl,
-                category,
-                html,
-                css,
-                editableFields,
-                isPro,
-                isActive,
-                sortOrder,
-                tags,
+                name, description, previewImageUrl, category,
+                html, css, editableFields, isPro, isActive, sortOrder, tags,
             } = req.body;
 
-            // Validaciones básicas
             if (!name || !description || !html || !css) {
                 return res.status(400).json({
                     success: false,
@@ -438,7 +401,6 @@ class TemplateController {
                 });
             }
 
-            // Validar que los placeholders en HTML/CSS correspondan a los editableFields
             const fieldKeys = (editableFields || []).map((f) => f.key);
             const htmlPlaceholders = [...html.matchAll(/\{\{([A-Z_]+)\}\}/g)].map((m) => m[1]);
             const cssPlaceholders = [...css.matchAll(/\{\{([A-Z_]+)\}\}/g)].map((m) => m[1]);
@@ -453,12 +415,9 @@ class TemplateController {
             }
 
             const template = await Template.create({
-                name,
-                description,
-                previewImageUrl,
+                name, description, previewImageUrl,
                 category: category || 'otro',
-                html,
-                css,
+                html, css,
                 editableFields: editableFields || [],
                 isPro: isPro !== undefined ? isPro : false,
                 isActive: isActive !== undefined ? isActive : true,
@@ -482,16 +441,11 @@ class TemplateController {
         }
     }
 
-    /**
-     * Actualizar plantilla (admin)
-     * PATCH /api/admin/templates/:templateId
-     */
     async adminUpdateTemplate(req, res) {
         try {
             const { templateId } = req.params;
             const updates = req.body;
 
-            // No permitir actualizar campos internos
             delete updates._id;
             delete updates.createdBy;
             delete updates.usageCount;
@@ -523,10 +477,6 @@ class TemplateController {
         }
     }
 
-    /**
-     * Eliminar plantilla (admin)
-     * DELETE /api/admin/templates/:templateId
-     */
     async adminDeleteTemplate(req, res) {
         try {
             const { templateId } = req.params;
@@ -552,10 +502,6 @@ class TemplateController {
         }
     }
 
-    /**
-     * Toggle estado activo de una plantilla (admin)
-     * PATCH /api/admin/templates/:templateId/toggle
-     */
     async adminToggleTemplate(req, res) {
         try {
             const { templateId } = req.params;
