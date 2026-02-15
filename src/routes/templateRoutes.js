@@ -1,8 +1,25 @@
 import express from 'express';
+import multer from 'multer';
 import templateController from '../controllers/templateController.js';
 import { authenticate, optionalAuth } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Configuración de multer para subida de imágenes de plantilla
+const templateImageUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 15 * 1024 * 1024, // 5MB máximo
+    },
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Tipo de archivo no válido. Solo se permiten JPG, PNG, GIF y WebP'), false);
+        }
+    },
+});
 
 // ============================================
 // RUTAS PÚBLICAS (usuarios autenticados o no)
@@ -27,6 +44,22 @@ router.get('/:templateId', (req, res) => templateController.getTemplateById(req,
  * Body: { values: { TITULO: "...", MENSAJE: "..." } }
  */
 router.post('/:templateId/render', (req, res) => templateController.renderTemplate(req, res));
+
+// ============================================
+// RUTAS AUTENTICADAS (requieren login + PRO)
+// ============================================
+
+/**
+ * POST /api/templates/:templateId/upload-image
+ * Subir imagen para un campo de tipo image_url de la plantilla
+ * Body (multipart/form-data): image (file), fieldKey (string)
+ */
+router.post(
+    '/:templateId/upload-image',
+    authenticate,
+    templateImageUpload.single('image'),
+    (req, res) => templateController.uploadTemplateImage(req, res)
+);
 
 /**
  * POST /api/templates/:templateId/create-page

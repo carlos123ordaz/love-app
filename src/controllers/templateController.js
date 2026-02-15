@@ -1,5 +1,6 @@
 import Template from '../models/Template.js';
 import Page from '../models/Page.js';
+import storageService from '../services/googleStorageService.js';
 
 class TemplateController {
     // ============================================
@@ -75,7 +76,7 @@ class TemplateController {
     async renderTemplate(req, res) {
         try {
             const { templateId } = req.params;
-            const { values } = req.body; // { TITULO: "Mi título", MENSAJE: "Hola", ... }
+            const { values } = req.body;
 
             const template = await Template.findOne({
                 _id: templateId,
@@ -105,6 +106,109 @@ class TemplateController {
     }
 
     /**
+     * Subir imagen para un campo de plantilla (requiere PRO + auth)
+     * POST /api/templates/:templateId/upload-image
+     * Body (multipart): image (file), fieldKey (string)
+     */
+    async uploadTemplateImage(req, res) {
+        try {
+            const user = req.user;
+            const { templateId } = req.params;
+            const { fieldKey } = req.body;
+
+            // Verificar PRO
+            if (!user.isProActive()) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Requiere plan PRO para subir imágenes en plantillas',
+                    code: 'PRO_REQUIRED',
+                });
+            }
+
+            if (!req.file) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'No se proporcionó imagen',
+                });
+            }
+
+            // Validar tipo de archivo
+            if (!storageService.isValidImageType(req.file.mimetype)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Tipo de archivo no válido. Solo se permiten JPG, PNG, GIF y WebP',
+                });
+            }
+
+            // Validar tamaño
+            if (!storageService.isValidFileSize(req.file.size)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'El archivo es demasiado grande. Máximo 5MB',
+                });
+            }
+
+            // Verificar que la plantilla existe
+            const template = await Template.findOne({
+                _id: templateId,
+                isActive: true,
+            });
+
+            if (!template) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Plantilla no encontrada',
+                });
+            }
+
+            // Verificar que el fieldKey corresponde a un campo de tipo image_url
+            const field = template.editableFields.find(
+                (f) => f.key === fieldKey && f.type === 'image_url'
+            );
+
+            if (!field) {
+                return res.status(400).json({
+                    success: false,
+                    message: `El campo "${fieldKey}" no es un campo de imagen válido en esta plantilla`,
+                });
+            }
+
+            // Validar tamaño máximo específico del campo si tiene imageConfig
+            if (field.imageConfig?.maxSizeMB) {
+                const maxBytes = 15 * 1024 * 1024;
+                if (req.file.size > maxBytes) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `La imagen para "${field.label}" no puede superar 15MB`,
+                    });
+                }
+            }
+
+            // Subir a Google Cloud Storage
+            const imageUrl = await storageService.uploadReferenceImage(
+                req.file.buffer,
+                `tpl_${templateId}_${fieldKey}_${req.file.originalname}`,
+                user._id.toString()
+            );
+
+            return res.json({
+                success: true,
+                message: 'Imagen subida exitosamente',
+                data: {
+                    imageUrl,
+                    fieldKey,
+                },
+            });
+        } catch (error) {
+            console.error('Error uploading template image:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Error al subir la imagen',
+            });
+        }
+    }
+
+    /**
      * Crear página a partir de una plantilla (requiere PRO)
      * POST /api/templates/:templateId/create-page
      */
@@ -113,7 +217,7 @@ class TemplateController {
             const user = req.user;
             const { templateId } = req.params;
             const {
-                values,          // { TITULO: "...", MENSAJE: "...", ... }
+                values,
                 recipientName,
                 yesButtonText,
                 noButtonText,
@@ -154,11 +258,41 @@ class TemplateController {
 
             // Validar campos requeridos
             for (const field of template.editableFields) {
-                if (field.required && (!values[field.key] || !values[field.key].trim())) {
-                    return res.status(400).json({
-                        success: false,
-                        message: `El campo "${field.label}" es requerido`,
-                    });
+                if (field.required) {
+                    const value = values[field.key];
+
+                    if (field.type === 'image_url') {
+                        // Para imágenes requeridas: verificar que sea una URL válida
+                        if (!value || !value.trim()) {
+                            return res.status(400).json({
+                                success: false,
+                                message: `La imagen "${field.label}" es requerida`,
+                            });
+                        }
+                        // Validar que sea URL https
+                        try {
+                            const parsed = new URL(value.trim());
+                            if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+                                return res.status(400).json({
+                                    success: false,
+                                    message: `La URL de "${field.label}" no es válida`,
+                                });
+                            }
+                        } catch {
+                            return res.status(400).json({
+                                success: false,
+                                message: `La URL de "${field.label}" no es válida`,
+                            });
+                        }
+                    } else {
+                        // Para campos de texto requeridos
+                        if (!value || !value.trim()) {
+                            return res.status(400).json({
+                                success: false,
+                                message: `El campo "${field.label}" es requerido`,
+                            });
+                        }
+                    }
                 }
             }
 

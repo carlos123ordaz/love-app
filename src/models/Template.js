@@ -5,6 +5,38 @@ import mongoose from 'mongoose';
  * Cada campo tiene un placeholder (ej: {{TITULO}}) que se reemplaza
  * en el HTML/CSS con el valor que el usuario ingresa.
  */
+
+// Sub-schema para configuración específica de campos de imagen
+const imageConfigSchema = new mongoose.Schema(
+    {
+        // Tamaño máximo en MB
+        maxSizeMB: {
+            type: Number,
+            default: 3,
+        },
+        // Aspect ratio sugerido (ej: "1:1", "16:9", "4:3", null = libre)
+        aspectRatio: {
+            type: String,
+            default: null,
+        },
+        // Dimensiones mínimas sugeridas
+        minWidth: {
+            type: Number,
+            default: 200,
+        },
+        minHeight: {
+            type: Number,
+            default: 200,
+        },
+        // Imagen placeholder cuando no hay imagen subida
+        fallbackImageUrl: {
+            type: String,
+            default: null,
+        },
+    },
+    { _id: false }
+);
+
 const editableFieldSchema = new mongoose.Schema(
     {
         // Clave interna usada como placeholder: {{KEY}}
@@ -51,6 +83,11 @@ const editableFieldSchema = new mongoose.Schema(
             type: Number,
             default: 0,
         },
+        // Configuración específica para campos tipo image_url
+        imageConfig: {
+            type: imageConfigSchema,
+            default: null,
+        },
     },
     { _id: false }
 );
@@ -90,7 +127,7 @@ const templateSchema = new mongoose.Schema(
             ],
             default: 'otro',
         },
-        // HTML de la plantilla (con placeholders tipo {{TITULO}}, {{MENSAJE}}, etc.)
+        // HTML de la plantilla (con placeholders tipo {{TITULO}}, {{MENSAJE}}, {{FOTO_1}}, etc.)
         html: {
             type: String,
             required: true,
@@ -104,12 +141,6 @@ const templateSchema = new mongoose.Schema(
         editableFields: {
             type: [editableFieldSchema],
             default: [],
-            validate: {
-                validator: function (v) {
-                    return v.length <= 20;
-                },
-                message: 'Máximo 20 campos editables',
-            },
         },
         // Si es gratis o requiere PRO
         isPro: {
@@ -155,6 +186,10 @@ templateSchema.index({ isPro: 1, isActive: 1 });
 /**
  * Método para renderizar el HTML con los valores del usuario.
  * Reemplaza todos los {{KEY}} con los valores proporcionados.
+ * Diferencia el tratamiento según el tipo de campo:
+ * - text/textarea: se escapa HTML para evitar XSS
+ * - color: se valida formato de color hex
+ * - image_url: se sanitiza como URL (sin escapar HTML, ya que va en src="")
  */
 templateSchema.methods.renderHtml = function (values = {}) {
     let renderedHtml = this.html;
@@ -163,10 +198,31 @@ templateSchema.methods.renderHtml = function (values = {}) {
     for (const field of this.editableFields) {
         const value = values[field.key] || field.defaultValue || '';
         const placeholder = `{{${field.key}}}`;
-        const escapedValue = escapeHtml(value);
 
-        renderedHtml = renderedHtml.replaceAll(placeholder, escapedValue);
-        renderedCss = renderedCss.replaceAll(placeholder, escapedValue);
+        let processedValue;
+        switch (field.type) {
+            case 'image_url':
+                // Para imágenes: sanitizar URL, no escapar como HTML
+                // Si no hay URL válida, usar fallback o string vacío
+                processedValue = sanitizeUrl(value);
+                if (!processedValue && field.imageConfig?.fallbackImageUrl) {
+                    processedValue = sanitizeUrl(field.imageConfig.fallbackImageUrl);
+                }
+                break;
+
+            case 'color':
+                // Para colores: validar formato hex
+                processedValue = /^#[0-9a-fA-F]{3,8}$/.test(value) ? value : (field.defaultValue || '#000000');
+                break;
+
+            default:
+                // Para texto: escapar HTML
+                processedValue = escapeHtml(value);
+                break;
+        }
+
+        renderedHtml = renderedHtml.replaceAll(placeholder, processedValue);
+        renderedCss = renderedCss.replaceAll(placeholder, processedValue);
     }
 
     return { html: renderedHtml, css: renderedCss };
@@ -185,7 +241,31 @@ templateSchema.statics.getActiveTemplates = async function (category = null) {
         .lean();
 };
 
-// Sanitizar HTML para evitar XSS
+/**
+ * Sanitizar URL para campos de imagen.
+ * Solo permite URLs HTTPS válidas para evitar XSS vía src="javascript:..."
+ */
+function sanitizeUrl(url) {
+    if (!url || typeof url !== 'string') return '';
+    const trimmed = url.trim();
+    if (!trimmed) return '';
+
+    try {
+        const parsed = new URL(trimmed);
+        // Solo permitir https (y http en desarrollo)
+        if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+            // Escapar comillas dobles para que sea seguro dentro de src="..."
+            return parsed.href.replace(/"/g, '%22');
+        }
+        return '';
+    } catch {
+        return '';
+    }
+}
+
+/**
+ * Sanitizar HTML para evitar XSS en campos de texto
+ */
 function escapeHtml(text) {
     if (!text) return '';
     return text
