@@ -1,6 +1,7 @@
 import User from '../models/User.js';
 import Page from '../models/Page.js';
 import Contact from '../models/Contact.js';
+import Notification from '../models/Notification.js';
 
 class AdminController {
     // ==================== DASHBOARD ====================
@@ -459,6 +460,83 @@ class AdminController {
         } catch (error) {
             console.error('Error updating contact:', error);
             return res.status(500).json({ success: false, message: 'Error al actualizar contacto' });
+        }
+    }
+
+    /**
+     * POST /api/admin/contacts/:contactId/reply
+     * Responder a un mensaje de contacto.
+     * - Guarda la respuesta en el contacto (adminReply + adminRepliedAt)
+     * - Cambia el estado a "resolved"
+     * - Si el contacto tiene userId, le envía una notificación in-app
+     */
+    async replyToContact(req, res) {
+        try {
+            const { contactId } = req.params;
+            const { replyMessage } = req.body;
+
+            if (!replyMessage || !replyMessage.trim()) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'El mensaje de respuesta es requerido',
+                });
+            }
+
+            const contact = await Contact.findById(contactId).populate('userId', 'email displayName');
+            if (!contact) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Contacto no encontrado',
+                });
+            }
+
+            // Guardar respuesta en el contacto
+            contact.adminReply = replyMessage.trim();
+            contact.adminRepliedAt = new Date();
+            contact.adminRepliedBy = req.user._id;
+            contact.status = 'resolved';
+            contact.respondedAt = new Date();
+            await contact.save();
+
+            // Si el contacto tiene un usuario registrado, enviar notificación
+            let notificationSent = false;
+            if (contact.userId) {
+                const userId = contact.userId._id || contact.userId;
+
+                await Notification.create({
+                    userId: userId,
+                    audience: 'individual',
+                    title: `📩 Respuesta a tu mensaje: "${contact.subject}"`,
+                    message: replyMessage.trim(),
+                    type: 'info',
+                    icon: '💬',
+                    actionUrl: `/contact/${contact._id}`,
+                    actionText: 'Ver respuesta',
+                    sentBy: req.user._id,
+                    metadata: {
+                        contactId: contact._id,
+                        subject: contact.subject,
+                    },
+                });
+                notificationSent = true;
+            }
+
+            return res.json({
+                success: true,
+                message: notificationSent
+                    ? 'Respuesta enviada y notificación entregada al usuario'
+                    : 'Respuesta guardada (el contacto no tiene cuenta registrada, no se envió notificación)',
+                data: {
+                    contact,
+                    notificationSent,
+                },
+            });
+        } catch (error) {
+            console.error('Error replying to contact:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Error al responder contacto',
+            });
         }
     }
 

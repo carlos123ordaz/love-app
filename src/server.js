@@ -12,7 +12,7 @@ import webhookRoutes from './routes/webhookRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import templateRoutes from './routes/templateRoutes.js';
-
+import notificationRoutes from './routes/notificationRoutes.js';
 dotenv.config();
 
 const app = express();
@@ -64,7 +64,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/templates', templateRoutes);
-
+app.use('/api/notifications', notificationRoutes);
 // Ruta 404
 app.use('*', (req, res) => {
     res.status(404).json({

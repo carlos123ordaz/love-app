@@ -49,6 +49,25 @@ const contactSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+        adminReply: {
+            type: String,
+            default: null,
+            trim: true,
+            maxlength: 500,
+        },
+
+        // Fecha en que se respondió
+        adminRepliedAt: {
+            type: Date,
+            default: null,
+        },
+
+        // Quién respondió (referencia al admin)
+        adminRepliedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            default: null,
+        },
     },
     {
         timestamps: true,

@@ -28,25 +28,14 @@ router.get('/contacts/:contactId', (req, res) => adminController.getContactDetai
 router.patch('/contacts/:contactId', (req, res) => adminController.updateContact(req, res));
 router.delete('/contacts/:contactId', (req, res) => adminController.deleteContact(req, res));
 
+// 🆕 Responder a un contacto (envía notificación al usuario)
+router.post('/contacts/:contactId/reply', (req, res) => adminController.replyToContact(req, res));
 
-
-
-
-// Dentro de tu router de admin (después de authenticate + isAdmin middleware):
-
-// GET /api/admin/templates - Listar todas las plantillas
+// Templates
 router.get('/templates', (req, res) => templateController.adminGetTemplates(req, res));
-
-// POST /api/admin/templates - Crear plantilla
 router.post('/templates', (req, res) => templateController.adminCreateTemplate(req, res));
-
-// PATCH /api/admin/templates/:templateId - Actualizar plantilla
 router.patch('/templates/:templateId', (req, res) => templateController.adminUpdateTemplate(req, res));
-
-// DELETE /api/admin/templates/:templateId - Eliminar plantilla
 router.delete('/templates/:templateId', (req, res) => templateController.adminDeleteTemplate(req, res));
-
-// PATCH /api/admin/templates/:templateId/toggle - Toggle activo/inactivo
 router.patch('/templates/:templateId/toggle', (req, res) => templateController.adminToggleTemplate(req, res));
 
 export default router;
