@@ -125,7 +125,7 @@ class GoogleStorageService {
      * Validar tamaño de archivo (máximo 5MB)
      */
     isValidFileSize(size) {
-        const maxSize = 5 * 1024 * 1024; // 5MB
+        const maxSize = 15 * 1024 * 1024; // 5MB
         return size <= maxSize;
     }
 }

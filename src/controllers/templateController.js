@@ -114,16 +114,6 @@ class TemplateController {
             const user = req.user;
             const { templateId } = req.params;
             const { fieldKey } = req.body;
-
-            // Verificar PRO
-            if (!user.isProActive()) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Requiere plan PRO para subir imágenes en plantillas',
-                    code: 'PRO_REQUIRED',
-                });
-            }
-
             if (!req.file) {
                 return res.status(400).json({
                     success: false,
@@ -141,7 +131,7 @@ class TemplateController {
             if (!storageService.isValidFileSize(req.file.size)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'El archivo es demasiado grande. Máximo 5MB',
+                    message: 'El archivo es demasiado grande. Máximo 15MB',
                 });
             }
 
