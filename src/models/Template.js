@@ -106,7 +106,7 @@ const templateSchema = new mongoose.Schema(
             type: String,
             required: true,
             trim: true,
-            maxlength: 300,
+            maxlength: 500,
         },
         // URL de la imagen de preview (captura de pantalla del diseño)
         previewImageUrl: {
