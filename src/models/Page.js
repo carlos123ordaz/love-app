@@ -222,6 +222,15 @@ const pageSchema = new mongoose.Schema(
         },
 
         // ============================================
+        // VIDEO EMBED (solo PRO — YouTube / TikTok)
+        // ============================================
+        videoUrl: {
+            type: String,
+            default: null,
+            trim: true,
+        },
+
+        // ============================================
         // MÚSICA (solo PRO)
         // ============================================
         backgroundMusic: {
@@ -337,9 +346,9 @@ pageSchema.statics.findByIdentifier = async function (identifier) {
 
 // Método para incrementar vistas únicas de forma atómica.
 // Solo cuenta si el fingerprint (IP + user-agent hasheado) es nuevo.
-// Si el visitante ya accedió antes, no se contabiliza nada.
+// Devuelve true si fue un visitante nuevo, false si ya había visitado.
 pageSchema.methods.incrementViews = async function (fingerprint = null) {
-    if (!fingerprint) return;
+    if (!fingerprint) return false;
 
     const existing = await this.constructor.findOne(
         { _id: this._id, viewerFingerprints: fingerprint },
@@ -351,7 +360,10 @@ pageSchema.methods.incrementViews = async function (fingerprint = null) {
             $inc: { views: 1, uniqueViews: 1 },
             $push: { viewerFingerprints: fingerprint },
         });
+        return true;
     }
+
+    return false;
 };
 
 // Método para agregar respuesta

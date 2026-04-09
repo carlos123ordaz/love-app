@@ -44,6 +44,12 @@ const userSchema = new mongoose.Schema(
             type: Date,
             default: Date.now,
         },
+        // Suscripciones Web Push (pueden haber varias — distinto navegador/dispositivo)
+        pushSubscriptions: {
+            type: [mongoose.Schema.Types.Mixed],
+            default: [],
+            select: false,
+        },
         // Historial de pagos
         payments: [
             {

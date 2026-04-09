@@ -94,6 +94,7 @@ class PageControllerExtended {
                 'backgroundColor',
                 'textColor',
                 'isActive',
+                'videoUrl',
             ];
 
             allowedUpdates.forEach((field) => {

@@ -1,12 +1,44 @@
 import crypto from 'crypto';
 import Page from '../models/Page.js';
+import User from '../models/User.js';
 import geminiService from '../services/geminiService.js';
 import storageService from '../services/googleStorageService.js';
+import { sendPushToUser } from '../services/pushService.js';
 
 function getVisitorFingerprint(req) {
     const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
     const userAgent = req.headers['user-agent'] || '';
     return crypto.createHash('sha256').update(`${ip}:${userAgent}`).digest('hex');
+}
+
+/**
+ * Enviar push notification al dueño de la página cuando tiene un nuevo visitante único.
+ * Se ejecuta en background — no bloquea la respuesta HTTP.
+ */
+async function notifyPageOwner(page) {
+    try {
+        const owner = await User.findById(page.userId).select('+pushSubscriptions');
+        if (!owner || !owner.pushSubscriptions?.length) return;
+
+        const identifier = page.customSlug || page.shortId;
+        const payload = {
+            title: '👀 Alguien vio tu página',
+            body: `"${page.title}" acaba de recibir una visita`,
+            url: `/page/${page._id}`,
+            icon: '/favicon.ico',
+        };
+
+        const expired = await sendPushToUser(owner.pushSubscriptions, payload);
+
+        // Limpiar suscripciones expiradas
+        if (expired.length > 0) {
+            await User.findByIdAndUpdate(owner._id, {
+                $pull: { pushSubscriptions: { endpoint: { $in: expired } } },
+            });
+        }
+    } catch (err) {
+        console.error('Error sending push to page owner:', err.message);
+    }
 }
 
 // Features que requieren PRO
@@ -62,6 +94,9 @@ class PageController {
         const errors = [];
 
         if (!isPro) {
+            if (body.videoUrl && body.videoUrl.trim()) {
+                errors.push('El video embed requiere plan PRO');
+            }
             if (PRO_THEMES.includes(body.theme)) {
                 errors.push('El tema seleccionado requiere plan PRO');
             }
@@ -155,6 +190,7 @@ class PageController {
                 selectedStickers,
                 showWatermark,
                 customSlug,
+                videoUrl,
             } = req.body;
 
             // Verificar PRO para página tipo 'pro' (IA)
@@ -223,6 +259,7 @@ class PageController {
                 bodyFont: bodyFont || 'Quicksand',
                 animation: animation || 'none',
                 backgroundMusic: isPro ? (backgroundMusic || 'none') : 'none',
+                videoUrl: isPro && videoUrl ? videoUrl.trim() : null,
                 selectedStickers: parsedStickers,
                 showWatermark: isPro ? (showWatermark === 'false' ? false : true) : true,
                 // Páginas gratuitas expiran en 30 días; PRO sin vencimiento
@@ -370,7 +407,8 @@ class PageController {
             }
 
             const fingerprint = getVisitorFingerprint(req);
-            await page.incrementViews(fingerprint);
+            const wasNew = await page.incrementViews(fingerprint);
+            if (wasNew) notifyPageOwner(page); // fire-and-forget
 
             return res.json({
                 success: true,
@@ -399,6 +437,7 @@ class PageController {
                     customHTML: page.customHTML,
                     customCSS: page.customCSS,
                     referenceImageUrl: page.referenceImageUrl,
+                    videoUrl: page.videoUrl || null,
                     createdAt: page.createdAt,
                     createdBy: page.userId?.displayName || 'Anónimo',
                 },

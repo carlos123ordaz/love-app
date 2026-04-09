@@ -1,13 +1,29 @@
 import express from 'express';
 import notificationController from '../controllers/notificationController.js';
+import pushController from '../controllers/pushController.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/adminMiddleware.js';
 
 const router = express.Router();
 
 // ============================================
+// RUTAS WEB PUSH
+// ============================================
+
+/** POST /api/notifications/push/subscribe — guardar suscripción */
+router.post('/push/subscribe', authenticate, (req, res) => pushController.subscribe(req, res));
+
+/** DELETE /api/notifications/push/unsubscribe — eliminar suscripción */
+router.delete('/push/unsubscribe', authenticate, (req, res) => pushController.unsubscribe(req, res));
+
+/** GET /api/notifications/push/vapid-public-key — clave pública VAPID */
+router.get('/push/vapid-public-key', (req, res) =>
+    res.json({ success: true, data: { publicKey: process.env.VAPID_PUBLIC_KEY } })
+);
+
+// ============================================
 // RUTAS DE USUARIO (requieren autenticación)
-// ============================================ 
+// ============================================
 
 /**
  * GET /api/notifications
