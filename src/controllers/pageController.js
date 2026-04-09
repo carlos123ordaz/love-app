@@ -1,6 +1,13 @@
+import crypto from 'crypto';
 import Page from '../models/Page.js';
 import geminiService from '../services/geminiService.js';
 import storageService from '../services/googleStorageService.js';
+
+function getVisitorFingerprint(req) {
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
+    const userAgent = req.headers['user-agent'] || '';
+    return crypto.createHash('sha256').update(`${ip}:${userAgent}`).digest('hex');
+}
 
 // Features que requieren PRO
 const PRO_THEMES = ['neon', 'vintage', 'aurora', 'cherry'];
@@ -218,6 +225,8 @@ class PageController {
                 backgroundMusic: isPro ? (backgroundMusic || 'none') : 'none',
                 selectedStickers: parsedStickers,
                 showWatermark: isPro ? (showWatermark === 'false' ? false : true) : true,
+                // Páginas gratuitas expiran en 30 días; PRO sin vencimiento
+                expiresAt: isPro ? null : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
             };
             if (validatedSlug) {
                 pageData.customSlug = validatedSlug;
@@ -341,13 +350,27 @@ class PageController {
             const page = await Page.findByIdentifier(shortId);
 
             if (!page) {
+                // Verificar si la página existe pero expiró
+                const expiredPage = await Page.findOne({
+                    $or: [{ shortId }, { customSlug: shortId }],
+                    isDeleted: { $ne: true },
+                    expiresAt: { $lte: new Date() },
+                });
+                if (expiredPage) {
+                    return res.status(410).json({
+                        success: false,
+                        message: 'Esta página ha expirado',
+                        code: 'PAGE_EXPIRED',
+                    });
+                }
                 return res.status(404).json({
                     success: false,
                     message: 'Página no encontrada',
                 });
             }
 
-            await page.incrementViews(false);
+            const fingerprint = getVisitorFingerprint(req);
+            await page.incrementViews(fingerprint);
 
             return res.json({
                 success: true,
@@ -456,12 +479,13 @@ class PageController {
                     title: p.title,
                     recipientName: p.recipientName,
                     pageType: p.pageType,
-                    views: p.views,
+                    views: p.uniqueViews,
                     totalResponses: p.responses.length,
                     yesCount,
                     noCount,
                     createdAt: p.createdAt,
                     isActive: p.isActive,
+                    expiresAt: p.expiresAt || null,
                 };
             });
 

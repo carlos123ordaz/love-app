@@ -253,6 +253,11 @@ const pageSchema = new mongoose.Schema(
             type: Number,
             default: 0,
         },
+        viewerFingerprints: {
+            type: [String],
+            default: [],
+            select: false,
+        },
 
         // Estado
         isActive: {
@@ -318,17 +323,35 @@ pageSchema.statics.findByIdentifier = async function (identifier) {
             { customSlug: identifier }
         ],
         isActive: true,
-        isDeleted: { $ne: true }
+        isDeleted: { $ne: true },
+        $and: [
+            {
+                $or: [
+                    { expiresAt: null },
+                    { expiresAt: { $gt: new Date() } }
+                ]
+            }
+        ]
     }).populate('userId', 'displayName');
 };
 
-// Método para incrementar vistas
-pageSchema.methods.incrementViews = async function (isUnique = false) {
-    this.views += 1;
-    if (isUnique) {
-        this.uniqueViews += 1;
+// Método para incrementar vistas únicas de forma atómica.
+// Solo cuenta si el fingerprint (IP + user-agent hasheado) es nuevo.
+// Si el visitante ya accedió antes, no se contabiliza nada.
+pageSchema.methods.incrementViews = async function (fingerprint = null) {
+    if (!fingerprint) return;
+
+    const existing = await this.constructor.findOne(
+        { _id: this._id, viewerFingerprints: fingerprint },
+        { _id: 1 }
+    );
+
+    if (!existing) {
+        await this.constructor.findByIdAndUpdate(this._id, {
+            $inc: { views: 1, uniqueViews: 1 },
+            $push: { viewerFingerprints: fingerprint },
+        });
     }
-    await this.save();
 };
 
 // Método para agregar respuesta

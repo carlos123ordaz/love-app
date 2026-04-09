@@ -169,7 +169,7 @@ class PageControllerExtended {
 
             const stats = {
                 totalPages: pages.length,
-                totalViews: pages.reduce((sum, page) => sum + page.views, 0),
+                totalViews: pages.reduce((sum, page) => sum + page.uniqueViews, 0),
                 totalResponses: pages.reduce((sum, page) => sum + page.responses.length, 0),
                 totalYes: pages.reduce(
                     (sum, page) => sum + page.responses.filter((r) => r.answer === 'yes').length,
