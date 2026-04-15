@@ -86,6 +86,25 @@ function safeJsonParse(value, fallback = []) {
 }
 
 class PageController {
+    async enforceFreePageLimit(user) {
+        if (user.isProActive()) return null;
+
+        const existingPages = await Page.countDocuments({
+            userId: user._id,
+            isDeleted: false,
+        });
+
+        if (existingPages >= 1) {
+            return {
+                success: false,
+                message: 'El plan gratuito permite crear solo 1 pagina. Actualiza a PRO para paginas ilimitadas.',
+                code: 'FREE_PAGE_LIMIT_REACHED',
+            };
+        }
+
+        return null;
+    }
+
     /**
      * Validar que el usuario no use features PRO sin serlo
      */
@@ -192,6 +211,11 @@ class PageController {
                 customSlug,
                 videoUrl,
             } = req.body;
+
+            const pageLimitError = await this.enforceFreePageLimit(user);
+            if (pageLimitError) {
+                return res.status(403).json(pageLimitError);
+            }
 
             // Verificar PRO para página tipo 'pro' (IA)
             if (pageType === 'pro' && !user.isProActive()) {
