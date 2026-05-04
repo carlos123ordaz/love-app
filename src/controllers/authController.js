@@ -1,34 +1,48 @@
 import User from '../models/User.js';
+import Page from '../models/Page.js';
+
+async function buildUserPayload(user) {
+    const isPro = user.isProActive();
+    const totalPages = await Page.countDocuments({
+        userId: user._id,
+        isDeleted: false,
+    });
+    const remainingPages = isPro ? 'unlimited' : Math.max(0, 1 - totalPages);
+
+    return {
+        _id: user._id,
+        firebaseUid: user.firebaseUid,
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        isPro,
+        pagesCreated: user.pagesCreated,
+        canCreatePage: isPro || totalPages < 1,
+        remainingPages,
+        lastLogin: user.lastLogin,
+        createdAt: user.createdAt,
+        isAdmin: user.isAdmin,
+    };
+}
 
 class AuthController {
     /**
-     * Obtener información del usuario actual
+     * Obtener informacion del usuario actual
      * GET /api/auth/me
      */
     async getMe(req, res) {
         try {
-            const user = req.user;
+            const payload = await buildUserPayload(req.user);
 
             return res.json({
                 success: true,
-                data: {
-                    _id: user._id,
-                    firebaseUid: user.firebaseUid,
-                    email: user.email,
-                    displayName: user.displayName,
-                    photoURL: user.photoURL,
-                    isPro: user.isProActive(),
-                    pagesCreated: user.pagesCreated,
-                    lastLogin: user.lastLogin,
-                    createdAt: user.createdAt,
-                    isAdmin: user.isAdmin,
-                },
+                data: payload,
             });
         } catch (error) {
             console.error('Error in getMe:', error);
             return res.status(500).json({
                 success: false,
-                message: 'Error al obtener información del usuario',
+                message: 'Error al obtener informacion del usuario',
             });
         }
     }
@@ -48,7 +62,6 @@ class AuthController {
                 });
             }
 
-            // Buscar o crear usuario
             let user = await User.findOne({ firebaseUid });
 
             if (!user) {
@@ -59,24 +72,18 @@ class AuthController {
                     photoURL: photoURL || null,
                 });
 
-                console.log(`✅ New user synced: ${user.email}`);
+                console.log(`New user synced: ${user.email}`);
             } else {
-                // Actualizar información si cambió
                 user.displayName = displayName || user.displayName;
                 user.photoURL = photoURL || user.photoURL;
                 await user.updateLastLogin();
             }
 
+            const payload = await buildUserPayload(user);
+
             return res.json({
                 success: true,
-                data: {
-                    _id: user._id,
-                    email: user.email,
-                    displayName: user.displayName,
-                    photoURL: user.photoURL,
-                    isPro: user.isProActive(),
-                    pagesCreated: user.pagesCreated,
-                },
+                data: payload,
             });
         } catch (error) {
             console.error('Error syncing user:', error);
