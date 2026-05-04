@@ -145,6 +145,11 @@ class PageControllerExtended {
             page.isActive = false;
             await page.save();
 
+            if (user.pagesCreated > 0) {
+                user.pagesCreated -= 1;
+                await user.save();
+            }
+
             return res.json({
                 success: true,
                 message: 'Página eliminada exitosamente',
