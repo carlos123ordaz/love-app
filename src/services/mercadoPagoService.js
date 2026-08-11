@@ -19,11 +19,12 @@ class MercadoPagoService {
                 items: [
                     {
                         id: 'pro-plan',
-                        title: 'Plan PRO - Páginas Ilimitadas',
-                        description: 'Acceso permanente a creación ilimitada de páginas personalizadas con IA',
+                        title: 'Plan PRO - 1 año',
+                        description: 'Un año de páginas ilimitadas, sin caducidad, URL personalizada y diseño con IA',
                         quantity: 1,
                         currency_id: 'PEN',
-                        unit_price: 7,
+                        // ~9 USD al cambio de referencia; revisar si el tipo se mueve.
+                        unit_price: 34,
                     },
                 ],
                 payer: {

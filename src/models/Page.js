@@ -285,6 +285,24 @@ const pageSchema = new mongoose.Schema(
             ref: 'Template',
             default: null,
         },
+
+        // ============================================
+        // RECORDATORIO DE OCASIÓN
+        // ============================================
+        // La fecha que celebra esta carta (aniversario, cumpleaños...). Sirve
+        // para avisar al autor unos días antes del siguiente, y es lo que
+        // convierte un producto de un solo uso en uno que da motivos para
+        // volver fuera de San Valentín.
+        occasionDate: {
+            type: Date,
+            default: null,
+        },
+        // Año del último aviso enviado: evita repetir el mismo aniversario y
+        // permite reclamar el envío de forma atómica si hay varias instancias.
+        lastReminderYear: {
+            type: Number,
+            default: null,
+        },
     },
     {
         timestamps: true,
@@ -296,6 +314,8 @@ pageSchema.index({ shortId: 1 });
 pageSchema.index({ customSlug: 1 }, { unique: true, sparse: true });
 pageSchema.index({ userId: 1, createdAt: -1 });
 pageSchema.index({ isActive: 1, expiresAt: 1 });
+// El job de recordatorios sólo mira páginas con fecha de ocasión.
+pageSchema.index({ occasionDate: 1, isDeleted: 1 });
 
 // 🆕 Método para generar URL completa (actualizado para soportar custom slug)
 pageSchema.methods.getFullUrl = function () {

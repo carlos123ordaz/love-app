@@ -286,6 +286,23 @@ class PaymentController {
             }
             formattedPayment.provider = provider;
 
+            // PRO pasó de pago único de por vida a suscripción anual.
+            //
+            // Quien compró antes tiene proExpiresAt = null, que isProActive()
+            // interpreta como permanente: se le respeta y no se le pone fecha
+            // aunque vuelva a pagar. Para el resto, la renovación se acumula
+            // sobre lo que le quede, no sobre hoy, para que no pierda días.
+            const isLifetime = user.isPro && user.proExpiresAt === null;
+            let proExpiresAt = null;
+
+            if (!isLifetime) {
+                const current = user.proExpiresAt && user.proExpiresAt > new Date()
+                    ? new Date(user.proExpiresAt)
+                    : new Date();
+                current.setFullYear(current.getFullYear() + 1);
+                proExpiresAt = current;
+            }
+
             // ✅ FIX: Operación atómica - solo actualiza si el pago NO existe aún
             const result = await User.findOneAndUpdate(
                 {
@@ -297,7 +314,7 @@ class PaymentController {
                 {
                     $set: {
                         isPro: true,
-                        proExpiresAt: null, // PRO permanente
+                        proExpiresAt,
                     },
                     $push: {
                         payments: formattedPayment,

@@ -13,11 +13,15 @@ import contactRoutes from './routes/contactRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import templateRoutes from './routes/templateRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import { startReminderScheduler } from './services/reminderService.js';
 dotenv.config();
 
 const app = express();
 
 connectDB();
+
+// Avisos de aniversarios y fechas guardadas: se revisa cada hora.
+startReminderScheduler();
 
 app.use(helmet());
 app.set('trust proxy', 1);

@@ -89,15 +89,27 @@ class PageController {
     async enforceFreePageLimit(user) {
         if (user.isProActive()) return null;
 
-        const existingPages = await Page.countDocuments({
+        // Antes se contaban TODAS las páginas históricas, así que un usuario
+        // gratuito podía crear una sola carta en toda su vida: la creaba, se le
+        // caducaba a los 7 días y ya no podía hacer otra nunca. Eso mataba el
+        // hábito antes de que existiera. Ahora el límite es de páginas *vivas*
+        // a la vez, así que puede seguir usando el producto indefinidamente y
+        // PRO sigue teniendo sentido (simultáneas ilimitadas y sin caducidad).
+        const now = new Date();
+        const activePages = await Page.countDocuments({
             userId: user._id,
             isDeleted: false,
+            isActive: true,
+            $or: [
+                { expiresAt: null },
+                { expiresAt: { $gt: now } },
+            ],
         });
 
-        if (existingPages >= 1) {
+        if (activePages >= 1) {
             return {
                 success: false,
-                message: 'El plan gratuito permite crear solo 1 pagina. Actualiza a PRO para paginas ilimitadas.',
+                message: 'El plan gratuito permite tener 1 pagina activa a la vez. Desactiva la actual o pasa a PRO para tener paginas ilimitadas.',
                 code: 'FREE_PAGE_LIMIT_REACHED',
             };
         }
@@ -210,6 +222,7 @@ class PageController {
                 showWatermark,
                 customSlug,
                 videoUrl,
+                occasionDate,
             } = req.body;
 
             const pageLimitError = await this.enforceFreePageLimit(user);
@@ -284,6 +297,12 @@ class PageController {
                 animation: animation || 'none',
                 backgroundMusic: isPro ? (backgroundMusic || 'none') : 'none',
                 videoUrl: isPro && videoUrl ? videoUrl.trim() : null,
+                // Fecha de la ocasión: opcional, y sólo si es una fecha válida.
+                occasionDate: (() => {
+                    if (!occasionDate) return null;
+                    const d = new Date(occasionDate);
+                    return Number.isNaN(d.getTime()) ? null : d;
+                })(),
                 selectedStickers: parsedStickers,
                 showWatermark: isPro ? (showWatermark === 'false' ? false : true) : true,
                 // Páginas gratuitas expiran en 30 días; PRO sin vencimiento
