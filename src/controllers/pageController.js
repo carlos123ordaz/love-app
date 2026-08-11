@@ -366,6 +366,20 @@ class PageController {
                 });
             }
 
+            // Un dato inválido es culpa de la petición, no del servidor: decir
+            // qué campo falla en vez de devolver un 500 opaco.
+            if (error.name === 'ValidationError') {
+                const fields = Object.keys(error.errors || {});
+                return res.status(400).json({
+                    success: false,
+                    message: fields.length
+                        ? `Datos inválidos en: ${fields.join(', ')}`
+                        : 'Datos de página inválidos',
+                    code: 'VALIDATION_ERROR',
+                    fields,
+                });
+            }
+
             return res.status(500).json({
                 success: false,
                 message: 'Error al crear la página',

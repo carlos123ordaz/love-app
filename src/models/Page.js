@@ -142,6 +142,9 @@ const pageSchema = new mongoose.Schema(
         theme: {
             type: String,
             enum: [
+                // 'riso' es la paleta por defecto del editor (papel crema,
+                // tinta negra, acento magenta).
+                'riso',
                 'romantic', 'sunset', 'ocean', 'garden', 'playful',
                 'elegant', 'minimal', 'dark',
                 // PRO themes
